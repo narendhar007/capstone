@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environment files
+.env
+.env.*
+
+# Dataset
+data/raw/
+data/processed/
+data/**/*.jpg
+data/**/*.jpeg
+data/**/*.png
+casting_data/
+
+# MLflow
+mlruns/
+mlartifacts/
+mlflow.db
+*.sqlite
+*.db
+
+# Models and generated artefacts
+models/
+checkpoints/
+*.pt
+*.pth
+*.onnx
+*.pkl
+*.joblib
+*.npz
+
+# Monitoring outputs
+drift_reports/
+evidently_reports/
+*.html
+
+# Logs
+logs/
+*.log
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
