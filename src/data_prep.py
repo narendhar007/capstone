@@ -24,7 +24,78 @@ IMG_EXTS = {".jpg", ".jpeg", ".png", ".bmp"}
 def find_data_root(base: Path | None = None) -> Path:
     # TODO 1: search under (base or config.DATA_DIR) for a dir whose train/ has both
     #         ok_front and def_front subfolders; return it.
-    raise NotImplementedError("Locate the casting train/test root")
+    """
+    Locate the root directory of the casting image dataset.
+
+    A valid dataset root must contain:
+
+        train/
+            ok_front/
+            def_front/
+        test/
+            ok_front/
+            def_front/
+
+    Parameters
+    ----------
+    base:
+        Directory beneath which the dataset should be searched.
+        When omitted, config.DATA_DIR is used.
+
+    Returns
+    -------
+    Path
+        Resolved path to the casting dataset root.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the configured search directory or expected dataset structure
+        cannot be found.
+    """
+
+    search_base = Path(base) if base is not None else config.DATA_DIR #if base is None, use the default data directory from config
+    search_base = search_base.expanduser().resolve() #expanduser() replaces ~ with the user home directory, resolve() returns the absolute path. 
+    #Required as I am using symbolic links for my data directory.
+
+    if not search_base.exists():
+        raise FileNotFoundError(
+            f"Data search directory does not exist: {search_base}"
+        )
+
+    # Define the required directory structure for a valid dataset root.
+    required_directories = (
+        ("train", "ok_front"),
+        ("train", "def_front"),
+        ("test", "ok_front"),
+        ("test", "def_front"),
+    )
+
+    # Helper function to check if a candidate directory is a valid dataset root.
+    def is_dataset_root(candidate: Path) -> bool:
+        return all(
+            (candidate / split / class_name).is_dir()
+            for split, class_name in required_directories
+        )
+
+    # First check whether the configured directory is itself the dataset root.
+    if is_dataset_root(search_base):
+        return search_base
+
+    # Search recursively. followlinks=True allows the Windows directory
+    # junction under data/casting_data to be traversed.
+    for current_directory, _, _ in os.walk(search_base, followlinks=True):
+        candidate = Path(current_directory)
+
+        if is_dataset_root(candidate):
+            return candidate.resolve()
+
+    raise FileNotFoundError(
+        "Casting dataset could not be found beneath "
+        f"{search_base}. Expected train/test directories containing "
+        "ok_front and def_front class folders."
+    )
+    #raise NotImplementedError("Locate the casting train/test root")
 
 
 def list_images(split_dir: Path) -> list[tuple[Path, int]]:
