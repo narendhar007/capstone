@@ -56,3 +56,6 @@ logs/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Generated data-quality output
+artifacts/data_quality_report.json
