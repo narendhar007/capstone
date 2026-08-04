@@ -456,8 +456,424 @@ def validate_quality(root: Path) -> dict:
 def build_splits(root: Path, version: str = "v1") -> dict:
     # TODO 1 (versioning): stratified val carve-out from train/; test from test/. Save
     #         {train,val,test}.json file lists + metadata.json (version, date, class defs,
-    #         split sizes/distribution, seed) under config.SPLIT_DIR/<version>/.
-    raise NotImplementedError("Build versioned stratified splits + metadata")
+    #         split sizes/distribution, seed) under config.SPLIT_DIR/<version>/
+    """
+    Create reproducible, duplicate-safe train, validation and test snapshots.
+
+    Strategy
+    --------
+    - Use the supplied train folder as the source of train/validation data.
+    - Use the supplied test folder as the source of final test data.
+    - Deduplicate exact image contents using MD5.
+    - When an exact image occurs in both train and test, retain the training
+      copy and exclude the matching test copy.
+    - Create a class-stratified validation split from the cleaned training set.
+    - Save relative file paths so the manifests remain portable.
+    - Treat an existing dataset version as immutable.
+
+    Parameters
+    ----------
+    root:
+        Dataset root containing train/ and test/ directories.
+
+    version:
+        Dataset snapshot identifier, for example ``v1``.
+
+    Returns
+    -------
+    dict
+        Metadata describing the versioned split.
+    """
+    root = Path(root).expanduser().resolve()
+
+    #check if root exists, if not raise a FileNotFoundError with a descriptive message.
+    if not root.exists():
+        raise FileNotFoundError(f"Dataset root does not exist: {root}")
+
+    #check if version is valid, if not raise a ValueError with a descriptive message.
+    if (
+        not version
+        or not version.replace("-", "").replace("_", "").isalnum()
+    ):
+        raise ValueError(
+            "Version must contain only letters, numbers, hyphens "
+            "or underscores."
+        )
+
+    source_train = list_images(root / "train")
+    source_test = list_images(root / "test")
+
+    #check if there are any training images, if not raise a ValueError with a descriptive message.
+    if not source_train:
+        raise ValueError("No training images were found.")
+
+    #check if there are any test images, if not raise a ValueError with a descriptive message.
+    if not source_test:
+        raise ValueError("No test images were found.")
+
+    #set the split policy to "prefer_train_remove_test_hash_overlap_v1" to indicate that the training set is preferred and any overlapping hashes in the test set will be removed.
+    split_policy = "prefer_train_remove_test_hash_overlap_v1"
+
+    # Helper functions for content hashing and relative path resolution.
+    def content_hash(path: Path) -> str:
+        return hashlib.md5(path.read_bytes()).hexdigest()
+
+    # Helper function to get the relative path of a file with respect to the dataset root and return it as a POSIX-style string.
+    def relative_path(path: Path) -> str:
+        return path.resolve().relative_to(root).as_posix()
+
+    # Calculate the source inventory before splitting.
+    inventory = []
+
+    # Iterate over the source training and test items, and for each item, create a dictionary containing the source split, relative path, label, and MD5 hash. Append this dictionary to the inventory list.
+    for source_split, items in (
+        ("train", source_train),
+        ("test", source_test),
+    ):
+        for path, label in items:
+            inventory.append(
+                {
+                    "source_split": source_split,
+                    "path": relative_path(path),
+                    "label": label,
+                    "md5": content_hash(path),
+                }
+            )
+
+    # Sort the inventory by source split, path, and label to ensure a consistent order for serialization and hashing.
+    inventory.sort(
+        key=lambda item: (
+            item["source_split"],
+            item["path"],
+            item["label"],
+        )
+    )
+
+    # Serialize the inventory to a JSON string with sorted keys and compact separators.
+    inventory_serialised = json.dumps(
+        inventory,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+    # Compute the SHA-256 hash of the serialized inventory to create a unique identifier for the source inventory.
+    source_inventory_sha256 = hashlib.sha256(
+        inventory_serialised.encode("utf-8")
+    ).hexdigest()
+
+    # Create the version directory and metadata path based on the specified version.
+    version_dir = config.SPLIT_DIR / version
+    metadata_path = version_dir / "metadata.json"
+
+    # Dataset versions are immutable. Reuse the version only when the source
+    # inventory and splitting policy are unchanged.
+    if metadata_path.exists():
+        existing_metadata = json.loads(
+            metadata_path.read_text(encoding="utf-8")
+        )
+
+        same_inventory = (
+            existing_metadata.get("source_inventory_sha256")
+            == source_inventory_sha256
+        )
+
+        same_policy = (
+            existing_metadata.get("split_policy")
+            == split_policy
+        )
+
+        manifests_exist = all(
+            (version_dir / f"{name}.json").exists()
+            for name in ("train", "val", "test")
+        )
+
+        if same_inventory and same_policy and manifests_exist:
+            return existing_metadata
+
+        raise FileExistsError(
+            f"Dataset version '{version}' already exists but does not "
+            "match the current source inventory or split policy. "
+            "Use a new version identifier."
+        )
+
+    # Group items by content hash to identify duplicates and ensure consistent label assignment.
+    def group_by_hash(
+        items: list[tuple[Path, int]],
+    ) -> dict[str, list[tuple[Path, int]]]:
+        groups: dict[str, list[tuple[Path, int]]] = {}
+
+        for path, label in items:
+            digest = content_hash(path)
+            groups.setdefault(digest, []).append((path, label))
+
+        return groups
+
+    train_hash_groups = group_by_hash(source_train)
+    test_hash_groups = group_by_hash(source_test)
+
+    # Confirm that identical image content never has conflicting labels.
+    all_hash_groups: dict[str, list[tuple[Path, int]]] = {}
+
+    for groups in (train_hash_groups, test_hash_groups):
+        for digest, items in groups.items():
+            all_hash_groups.setdefault(digest, []).extend(items)
+
+    conflicting_hashes = []
+
+    for digest, items in all_hash_groups.items():
+        labels = {label for _, label in items}
+
+        if len(labels) > 1:
+            conflicting_hashes.append(
+                {
+                    "md5": digest,
+                    "files": [
+                        relative_path(path)
+                        for path, _ in items
+                    ],
+                    "labels": sorted(labels),
+                }
+            )
+
+    if conflicting_hashes:
+        raise ValueError(
+            "Identical image contents have conflicting class labels. "
+            "Resolve these records before splitting."
+        )
+
+    def representative(
+        items: list[tuple[Path, int]],
+    ) -> tuple[Path, int]:
+        return sorted(
+            items,
+            key=lambda item: relative_path(item[0]),
+        )[0]
+
+    # Keep one representative for every unique training hash.
+    unique_train = [
+        representative(items)
+        for _, items in sorted(train_hash_groups.items())
+    ]
+
+    train_hashes = set(train_hash_groups)
+    test_hashes = set(test_hash_groups)
+    overlapping_hashes = train_hashes & test_hashes
+
+    # Keep only test hashes that were not already represented in train.
+    unique_test = [
+        representative(items)
+        for digest, items in sorted(test_hash_groups.items())
+        if digest not in overlapping_hashes
+    ]
+
+    excluded_test_files = sorted(
+        relative_path(path)
+        for digest in overlapping_hashes
+        for path, _ in test_hash_groups[digest]
+    )
+
+    within_train_duplicates_removed = (
+        len(source_train) - len(train_hash_groups)
+    )
+
+    within_test_duplicates_removed = (
+        len(source_test) - len(test_hash_groups)
+    )
+
+    # Stratified train/validation split.
+    rng = random.Random(config.RANDOM_SEED)
+
+    train_items: list[tuple[Path, int]] = []
+    val_items: list[tuple[Path, int]] = []
+
+    for class_name, class_index in config.CLASS_TO_IDX.items():
+        class_items = sorted(
+            [
+                item
+                for item in unique_train
+                if item[1] == class_index
+            ],
+            key=lambda item: relative_path(item[0]),
+        )
+
+        if len(class_items) < 2:
+            raise ValueError(
+                f"Class '{class_name}' requires at least two unique "
+                "training images to create train and validation sets."
+            )
+
+        rng.shuffle(class_items)
+
+        validation_count = int(
+            round(len(class_items) * config.VAL_SPLIT)
+        )
+
+        validation_count = max(1, validation_count)
+        validation_count = min(
+            validation_count,
+            len(class_items) - 1,
+        )
+
+        val_items.extend(class_items[:validation_count])
+        train_items.extend(class_items[validation_count:])
+
+    # Stable ordering makes the saved manifests easy to compare.
+    train_items.sort(key=lambda item: relative_path(item[0]))
+    val_items.sort(key=lambda item: relative_path(item[0]))
+    unique_test.sort(key=lambda item: relative_path(item[0]))
+
+    final_splits = {
+        "train": train_items,
+        "val": val_items,
+        "test": unique_test,
+    }
+
+    # Final leakage assertion using the image contents, not file names.
+    final_hash_sets = {
+        name: {
+            content_hash(path)
+            for path, _ in items
+        }
+        for name, items in final_splits.items()
+    }
+
+    overlap_counts = {
+        "train_val": len(
+            final_hash_sets["train"]
+            & final_hash_sets["val"]
+        ),
+        "train_test": len(
+            final_hash_sets["train"]
+            & final_hash_sets["test"]
+        ),
+        "val_test": len(
+            final_hash_sets["val"]
+            & final_hash_sets["test"]
+        ),
+    }
+
+    if any(overlap_counts.values()):
+        raise RuntimeError(
+            f"Hash leakage remains after splitting: {overlap_counts}"
+        )
+
+    def split_summary(
+        items: list[tuple[Path, int]],
+    ) -> dict:
+        label_counts = Counter(
+            label
+            for _, label in items
+        )
+
+        class_counts = {
+            class_name: label_counts[class_index]
+            for class_name, class_index
+            in config.CLASS_TO_IDX.items()
+        }
+
+        size = len(items)
+
+        class_percentages = {
+            class_name: (
+                round(100.0 * count / size, 2)
+                if size
+                else 0.0
+            )
+            for class_name, count in class_counts.items()
+        }
+
+        return {
+            "size": size,
+            "class_counts": class_counts,
+            "class_percentages": class_percentages,
+        }
+
+    version_dir.mkdir(parents=True, exist_ok=False)
+
+    manifest_hashes = {}
+
+    for split_name, items in final_splits.items():
+        manifest = [
+            [relative_path(path), label]
+            for path, label in items
+        ]
+
+        manifest_text = json.dumps(
+            manifest,
+            indent=2,
+        )
+
+        manifest_path = version_dir / f"{split_name}.json"
+        manifest_path.write_text(
+            manifest_text,
+            encoding="utf-8",
+        )
+
+        manifest_hashes[split_name] = hashlib.sha256(
+            manifest_text.encode("utf-8")
+        ).hexdigest()
+
+    metadata = {
+        "version_id": version,
+        "created_at_utc": datetime.now(
+            timezone.utc
+        ).isoformat(),
+        "random_seed": config.RANDOM_SEED,
+        "validation_fraction": config.VAL_SPLIT,
+        "class_to_idx": config.CLASS_TO_IDX,
+        "positive_class": config.POSITIVE_CLASS,
+        "positive_class_index": config.POSITIVE_IDX,
+        "split_policy": split_policy,
+        "source_inventory_sha256": source_inventory_sha256,
+        "source_summary": {
+            "total_images": (
+                len(source_train) + len(source_test)
+            ),
+            "supplied_train_size": len(source_train),
+            "supplied_test_size": len(source_test),
+        },
+        "duplicate_handling": {
+            "hash_algorithm": "md5",
+            "policy": (
+                "Retain one representative per hash in the supplied "
+                "training data. Remove test images whose hash occurs "
+                "in training. Retain one representative per remaining "
+                "test hash."
+            ),
+            "cross_split_duplicate_group_count": len(
+                overlapping_hashes
+            ),
+            "cross_split_test_files_excluded": len(
+                excluded_test_files
+            ),
+            "within_train_duplicates_removed":
+                within_train_duplicates_removed,
+            "within_test_duplicates_removed":
+                within_test_duplicates_removed,
+            "excluded_test_files": excluded_test_files,
+        },
+        "split_info": {
+            split_name: split_summary(items)
+            for split_name, items in final_splits.items()
+        },
+        "leakage_check": {
+            **overlap_counts,
+            "passed": not any(overlap_counts.values()),
+        },
+        "manifest_files": {
+            split_name: f"{split_name}.json"
+            for split_name in final_splits
+        },
+        "manifest_sha256": manifest_hashes,
+    }
+
+    metadata_path.write_text(
+        json.dumps(metadata, indent=2),
+        encoding="utf-8",
+    )
+
+    return metadata    
+    #raise NotImplementedError("Build versioned stratified splits + metadata")
 
 
 def load_split(version: str, name: str, root: Path) -> list[tuple[Path, int]]:

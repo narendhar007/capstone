@@ -1,0 +1,102 @@
+{
+  "version_id": "v1",
+  "created_at_utc": "2026-08-04T10:31:24.843884+00:00",
+  "random_seed": 42,
+  "validation_fraction": 0.15,
+  "class_to_idx": {
+    "ok_front": 0,
+    "def_front": 1
+  },
+  "positive_class": "def_front",
+  "positive_class_index": 1,
+  "split_policy": "prefer_train_remove_test_hash_overlap_v1",
+  "source_inventory_sha256": "a504579a5a8e84c39a0f563112496693f1d077a42d39643e2e6c9693b74e1b27",
+  "source_summary": {
+    "total_images": 160,
+    "supplied_train_size": 80,
+    "supplied_test_size": 80
+  },
+  "duplicate_handling": {
+    "hash_algorithm": "md5",
+    "policy": "Retain one representative per hash in the supplied training data. Remove test images whose hash occurs in training. Retain one representative per remaining test hash.",
+    "cross_split_duplicate_group_count": 22,
+    "cross_split_test_files_excluded": 22,
+    "within_train_duplicates_removed": 0,
+    "within_test_duplicates_removed": 0,
+    "excluded_test_files": [
+      "test/ok_front/cast_ok_0_1001.jpeg",
+      "test/ok_front/cast_ok_0_1002.jpeg",
+      "test/ok_front/cast_ok_0_1003.jpeg",
+      "test/ok_front/cast_ok_0_1019.jpeg",
+      "test/ok_front/cast_ok_0_1020.jpeg",
+      "test/ok_front/cast_ok_0_1021.jpeg",
+      "test/ok_front/cast_ok_0_1022.jpeg",
+      "test/ok_front/cast_ok_0_1026.jpeg",
+      "test/ok_front/cast_ok_0_1028.jpeg",
+      "test/ok_front/cast_ok_0_1031.jpeg",
+      "test/ok_front/cast_ok_0_1040.jpeg",
+      "test/ok_front/cast_ok_0_1066.jpeg",
+      "test/ok_front/cast_ok_0_1069.jpeg",
+      "test/ok_front/cast_ok_0_1077.jpeg",
+      "test/ok_front/cast_ok_0_1088.jpeg",
+      "test/ok_front/cast_ok_0_1092.jpeg",
+      "test/ok_front/cast_ok_0_1093.jpeg",
+      "test/ok_front/cast_ok_0_1095.jpeg",
+      "test/ok_front/cast_ok_0_1096.jpeg",
+      "test/ok_front/cast_ok_0_1120.jpeg",
+      "test/ok_front/cast_ok_0_1121.jpeg",
+      "test/ok_front/cast_ok_0_1127.jpeg"
+    ]
+  },
+  "split_info": {
+    "train": {
+      "size": 68,
+      "class_counts": {
+        "ok_front": 34,
+        "def_front": 34
+      },
+      "class_percentages": {
+        "ok_front": 50.0,
+        "def_front": 50.0
+      }
+    },
+    "val": {
+      "size": 12,
+      "class_counts": {
+        "ok_front": 6,
+        "def_front": 6
+      },
+      "class_percentages": {
+        "ok_front": 50.0,
+        "def_front": 50.0
+      }
+    },
+    "test": {
+      "size": 58,
+      "class_counts": {
+        "ok_front": 18,
+        "def_front": 40
+      },
+      "class_percentages": {
+        "ok_front": 31.03,
+        "def_front": 68.97
+      }
+    }
+  },
+  "leakage_check": {
+    "train_val": 0,
+    "train_test": 0,
+    "val_test": 0,
+    "passed": true
+  },
+  "manifest_files": {
+    "train": "train.json",
+    "val": "val.json",
+    "test": "test.json"
+  },
+  "manifest_sha256": {
+    "train": "73fc01713edd9b14452ffe3048ce1dd494ace1a051516bdeca7b4c7dcbb15ad2",
+    "val": "1c7a749d452d142e390d5babc313bc1fd027537434e6a515010476d58ff4e90a",
+    "test": "3b95b2877d52e70839d86111258cb8aa75faa1b13411c5dd26e4b82c03fc4f4b"
+  }
+}
