@@ -97,7 +97,7 @@ def find_data_root(base: Path | None = None) -> Path:
         f"{search_base}. Expected train/test directories containing "
         "ok_front and def_front class folders."
     )
-    #raise NotImplementedError("Locate the casting train/test root")
+    raise NotImplementedError("Locate the casting train/test root")
 
 
 def list_images(split_dir: Path) -> list[tuple[Path, int]]:
@@ -450,7 +450,7 @@ def validate_quality(root: Path) -> dict:
         "failure_reasons": failure_reasons,
         "passed": passed,
     }
-    #raise NotImplementedError("Implement data-quality validation")
+    raise NotImplementedError("Implement data-quality validation")
 
 
 def build_splits(root: Path, version: str = "v1") -> dict:
@@ -873,7 +873,7 @@ def build_splits(root: Path, version: str = "v1") -> dict:
     )
 
     return metadata    
-    #raise NotImplementedError("Build versioned stratified splits + metadata")
+    raise NotImplementedError("Build versioned stratified splits + metadata")
 
 
 def load_split(version: str, name: str, root: Path) -> list[tuple[Path, int]]:
@@ -885,10 +885,109 @@ def get_transforms(train: bool):
     from torchvision import transforms
     # TODO 2 (preprocessing + augmentation): Grayscale(3) → Resize(224) → [train: flip,
     #         affine rotation/translate, ColorJitter] → ToTensor → Normalize(ImageNet).
+    """
+    Build the image transformation pipeline.
+
+    Training images receive controlled random augmentation.
+    Validation, test and inference images receive only deterministic
+    preprocessing.
+    """
+    steps = [
+        # ResNet18 expects three input channels.
+        transforms.Grayscale(num_output_channels=3),
+
+        # ResNet18 ImageNet input size.
+        transforms.Resize(
+            (config.IMG_SIZE, config.IMG_SIZE)
+        ),
+    ]
+
+    # Add data augmentation steps for training images only.
+    if train:
+        steps.extend(
+            [
+                # Random horizontal flip with a probability defined in the config file. 
+                # This augmentation helps the model generalize better by simulating different orientations of the objects in the images.
+                transforms.RandomHorizontalFlip(
+                    p=config.AUG["hflip_p"]
+                ),
+                # Random affine transformation with rotation and translation parameters defined in the config file.
+                # This augmentation introduces variability in the training data, helping the model become more robust to changes
+                # in object orientation and position.
+                transforms.RandomAffine(
+                    degrees=config.AUG["rotation_degrees"],
+                    translate=(
+                        config.AUG["translate"],
+                        config.AUG["translate"],
+                    ),
+                ),
+                # Color jittering to randomly change the brightness and contrast of the images.
+                # This augmentation simulates different lighting conditions, which can help the model learn to recognize objects 
+                # under varying illumination.
+                transforms.ColorJitter(
+                    brightness=config.AUG["brightness"],
+                    contrast=config.AUG["contrast"],
+                ),
+            ]
+        )
+
+    # Convert the image to a tensor and normalize it using the mean and standard deviation values for the ImageNet dataset. 
+    steps.extend(
+        [
+            transforms.ToTensor(),
+            # Normalize the image tensor using the mean and standard deviation values for the ImageNet dataset.
+            # This normalization step ensures that the input data has a consistent scale, which can improve the 
+            # convergence and performance of the model during training.
+            transforms.Normalize(
+                mean=config.IMAGENET_MEAN,
+                std=config.IMAGENET_STD,
+            ),
+        ]
+    )
+
+    return transforms.Compose(steps)
     raise NotImplementedError("Define the train/eval transforms")
 
 
 def image_features(img: Image.Image) -> dict:
     # TODO 4 (statistical drift): return brightness, contrast, edge_density, sharpness,
     #         mean_intensity for a PIL image (keys == config.DRIFT_FEATURES).
+    #Function to extract interpretable numerical characteristics from one image. 
+    # The same function is used for Stage 1 exploratory data analysis and Stage 4 statistical drift monitoring.
+    """
+    Extract simple image statistics for EDA and drift monitoring.
+
+    Returns:
+        brightness      - normalised RMS brightness
+        contrast        - standard deviation of pixel intensity
+        edge_density    - proportion of strong edge pixels
+        sharpness       - variance of the edge response
+        mean_intensity  - average grayscale intensity
+    """
+    #Convert the input image to grayscale using the "L" mode, which represents 8-bit pixels, black and white.
+    #This simplifies the analysis by reducing the image to a single channel of intensity values.
+    gray = img.convert("L")
+
+    #Convert the grayscale image to a NumPy array of type float32.
+    pixels = np.asarray(gray, dtype=np.float32)
+
+    # Edge response using Pillow's built-in filter.
+    edge_image = gray.filter(ImageFilter.FIND_EDGES)
+    edges = np.asarray(edge_image, dtype=np.float32)
+
+    #Calculate the brightness, contrast, edge density, sharpness, and mean intensity of the image using various statistical measures.
+    features = {
+        "brightness": float(ImageStat.Stat(gray).rms[0] / 255.0),
+        "contrast": float(pixels.std()),
+        "edge_density": float((edges > 20).mean()),
+        "sharpness": float(edges.var()),
+        "mean_intensity": float(pixels.mean()),
+    }
+
+    #Return only the features specified in the configuration's DRIFT_FEATURES list, 
+    #ensuring that the output is consistent with the expected feature set for drift monitoring.
+    return {
+        name: features[name]
+        for name in config.DRIFT_FEATURES
+    }
     raise NotImplementedError("Extract per-image drift features")
