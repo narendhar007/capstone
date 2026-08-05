@@ -59,3 +59,6 @@ Thumbs.db
 
 # Generated data-quality output
 artifacts/data_quality_report.json
+
+# Generated training metadata
+artifacts/model_meta.json
