@@ -23,6 +23,7 @@ from collections import Counter
 from copy import deepcopy
 
 from sklearn.metrics import f1_score
+from sklearn.model_selection import train_test_split
 
 def set_seed(seed: int = config.RANDOM_SEED) -> None:
     """Set random seeds for reproducible training."""
@@ -35,59 +36,38 @@ def set_seed(seed: int = config.RANDOM_SEED) -> None:
 
 def _subsample(items, cap):
     # TODO: stratified subsample to `cap` (or return items if cap falsy/too small).
-    """
-    Return a reproducible class-balanced sample.
 
+    """
+    Return a reproducible stratified sample up to the requested cap.
+
+    The sampled data preserves the original class proportions.
     If the cap is zero, larger than the dataset, or too small to
     include every class, the original items are returned.
     """
     items = list(items)
-    classes = sorted({label for _, label in items})
+    labels = [
+        label
+        for _, label in items
+    ]
 
-    if not cap or cap >= len(items) or cap < len(classes):
+    classes = set(labels)
+
+    if (
+        not cap
+        or cap >= len(items)
+        or cap < len(classes)
+    ):
         return items
 
-    random_generator = random.Random(config.RANDOM_SEED)
-
-    # Group items by class label.
-    items_by_class = {
-        label: [
-            item
-            for item in items
-            if item[1] == label
-        ]
-        for label in classes
-    }
-
-    items_per_class = cap // len(classes)
-    remainder = cap % len(classes)
-
-    selected_items = []
-
-    # Distribute the remainder across the first few classes to ensure a balanced sample.
-    for index, label in enumerate(classes):
-        sample_count = items_per_class
-
-        if index < remainder:
-            sample_count += 1
-
-        # Ensure we don't sample more items than available in the class.
-        sample_count = min(
-            sample_count,
-            len(items_by_class[label]),
-        )
-
-        # Select a random sample of items for the current class.
-        selected_items.extend(
-            random_generator.sample(
-                items_by_class[label],
-                sample_count,
-            )
-        )
-
-    random_generator.shuffle(selected_items)
+    selected_items, _ = train_test_split(
+        items,
+        train_size=cap,
+        stratify=labels,
+        random_state=config.RANDOM_SEED,
+    )
 
     return selected_items
+
     raise NotImplementedError
 
 
@@ -323,14 +303,16 @@ def main() -> int:
     root = data_prep.find_data_root()
     qc = data_prep.validate_quality(root)
     (config.ARTIFACT_DIR / "data_quality_report.json").write_text(json.dumps(qc, indent=2))
-    data_prep.build_splits(root, "v1")
+    dataset_version = "v1"
+
+    data_prep.build_splits(root, dataset_version)
     # TODO 2/3: load splits, subsample train, build loaders, build model + optimiser + loss.
     # TODO 3 (MLflow): set_experiment; start_run; log_params; per-epoch log_metrics; early stop.
     # TODO 3 (eval + registry): test metrics; plot_eval; save_model; log_model + register +
     #         set @production alias; write model_meta.json + metrics.json.
     # TODO 4: save_reference_baseline on a clean val sample.
 
-    dataset_version = "v1"
+    
 
     # Reuse the immutable split manifests created in Stage 1.
     # Load the training and validation items from the dataset split manifests.
@@ -343,6 +325,14 @@ def main() -> int:
     val_items = data_prep.load_split(
         dataset_version,
         "val",
+        root,
+    )
+
+    # Load the test items from the dataset split manifest for evaluation after training.
+
+    test_items = data_prep.load_split(
+        dataset_version,
+        "test",
         root,
     )
 
@@ -373,6 +363,17 @@ def main() -> int:
     val_loader = DataLoader(
         CastingDataset(
             val_items,
+            train=False,
+        ),
+        batch_size=config.BATCH_SIZE,
+        shuffle=False,
+        num_workers=config.NUM_WORKERS,
+    )
+
+    # Create a DataLoader for the test dataset without shuffling, as test data should be evaluated in a consistent order.
+    test_loader = DataLoader(
+        CastingDataset(
+            test_items,
             train=False,
         ),
         batch_size=config.BATCH_SIZE,
@@ -416,6 +417,7 @@ def main() -> int:
     print("Dataset version:", dataset_version)
     print("Training images:", len(train_items))
     print("Validation images:", len(val_items))
+    print("Test images:", len(test_items))
     print("Class weights:", weights.cpu().tolist())
     print(
         "Trainable parameters:",
@@ -435,7 +437,7 @@ def main() -> int:
     with mlflow.start_run(
         run_name=run_name
     ) as run:
-
+        # Log
         mlflow.log_params(
             {
                 "dataset_version": dataset_version,
@@ -447,6 +449,7 @@ def main() -> int:
                     config.POSITIVE_CLASS,
                 "training_images": len(train_items),
                 "validation_images": len(val_items),
+                "test_images": len(test_items),
                 "batch_size": config.BATCH_SIZE,
                 "epochs_requested": config.EPOCHS,
                 "learning_rate":
@@ -493,6 +496,88 @@ def main() -> int:
         # saves the model to the path specified in config.MODEL_PATH.
         save_model(net)
 
+        # Evaluate the restored best-validation checkpoint. Use evaluate.py to compute metrics, plot confusion matrix + ROC, 
+        # and identify misclassified samples.
+        y_true, y_pred, y_prob = evaluate.predict(
+            net,
+            test_loader,
+        )
+
+        test_metrics = evaluate.compute_metrics(
+            y_true,
+            y_pred,
+            y_prob,
+        )
+
+        evaluation_plot_path = evaluate.plot_eval(
+            y_true,
+            y_pred,
+            y_prob,
+        )
+
+        misclassified_samples = evaluate.failure_cases(
+            test_items,
+            y_true,
+            y_pred,
+            y_prob,
+        )
+
+        # Save the evaluation report, including MLflow run ID, dataset version, positive class, test metrics, 
+        # misclassified count, and failure cases, to a JSON file for reference.
+        evaluation_report = {
+            "mlflow_run_id": run.info.run_id,
+            "dataset_version": dataset_version,
+            "positive_class": config.POSITIVE_CLASS,
+            **test_metrics,
+            "misclassified_count": len(
+                misclassified_samples
+            ),
+            "failure_cases": misclassified_samples,
+        }
+
+        config.METRICS_PATH.write_text(
+            json.dumps(
+                evaluation_report,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        # Log the test dataset metrics to MLFlow
+        mlflow_test_metrics = {
+            "test_accuracy":
+                test_metrics["accuracy"],
+            "test_defect_precision":
+                test_metrics["defect_precision"],
+            "test_defect_recall":
+                test_metrics["defect_recall"],
+            "test_defect_f1":
+                test_metrics["defect_f1"],
+            "test_macro_f1":
+                test_metrics["macro_f1"],
+            "test_misclassified_count":
+                len(misclassified_samples),
+        }
+
+        if test_metrics["roc_auc"] is not None:
+            mlflow_test_metrics["test_roc_auc"] = (
+                test_metrics["roc_auc"]
+            )
+
+        mlflow.log_metrics(
+            mlflow_test_metrics
+        )
+
+        mlflow.log_artifact(
+            str(config.METRICS_PATH),
+            artifact_path="evaluation",
+        )
+
+        mlflow.log_artifact(
+            str(evaluation_plot_path),
+            artifact_path="evaluation",
+        )
+
         # Log the best validation F1 score, the epoch at which it occurred, and the
         # total number of epochs completed to MLflow for tracking.
         mlflow.log_metrics(
@@ -504,44 +589,49 @@ def main() -> int:
             }
         )
 
-        # Save the model metadata, including training parameters, best epoch, and best validation F1 score, to a JSON file for reference.
-        model_metadata = {
-            "mlflow_run_id": run.info.run_id,
-            "dataset_version":
-                dataset_version,
-            "random_seed":
-                config.RANDOM_SEED,
-            "device": config.DEVICE,
-            "training_images":
-                len(train_items),
-            "validation_images":
-                len(val_items),
-            "batch_size":
-                config.BATCH_SIZE,
-            "epochs_requested":
-                config.EPOCHS,
-            "epochs_completed":
-                len(history),
-            "best_epoch":
-                best_epoch,
-            "best_val_f1":
-                best_val_f1,
-            "learning_rate":
-                config.LEARNING_RATE,
-            "weight_decay":
-                config.WEIGHT_DECAY,
-            "class_weights":
-                weights.cpu().tolist(),
-            "history": history,
-        }
+        print("\nTest evaluation")
+        print(
+            f"Accuracy: "
+            f"{test_metrics['accuracy']:.4f}"
+        )
+        print(
+            f"Defect precision: "
+            f"{test_metrics['defect_precision']:.4f}"
+        )
+        print(
+            f"Defect recall: "
+            f"{test_metrics['defect_recall']:.4f}"
+        )
+        print(
+            f"Defect F1: "
+            f"{test_metrics['defect_f1']:.4f}"
+        )
+        print(
+            f"Macro F1: "
+            f"{test_metrics['macro_f1']:.4f}"
+        )
 
-        # Save the model metadata to a JSON file for reference, allowing for reproducibility and tracking of training parameters and results.
-        config.MODEL_META_PATH.write_text(
-            json.dumps(
-                model_metadata,
-                indent=2,
-            ),
-            encoding="utf-8",
+        if test_metrics["roc_auc"] is not None:
+            print(
+                f"ROC-AUC: "
+                f"{test_metrics['roc_auc']:.4f}"
+            )
+        print(
+            "Confusion matrix:",
+            test_metrics["confusion_matrix"],
+        )
+        print(
+            "Misclassified samples:",
+            len(misclassified_samples),
+        )
+        print(
+            "Evaluation plot:",
+            evaluation_plot_path,
+        )
+
+        print(
+            "Metrics file:",
+            config.METRICS_PATH,
         )
 
         # Set the model to evaluation mode before saving the reference baseline, ensuring that
@@ -583,6 +673,130 @@ def main() -> int:
             name="model",
             input_example=input_example,
             signature=signature,
+        )
+
+        # The logged model from the current run becomes the source
+        # for the registered model version.
+        model_uri = (
+            f"runs:/{run.info.run_id}/model"
+        )
+
+        registered_version = mlflow.register_model(
+            model_uri=model_uri,
+            name=config.REGISTERED_MODEL,
+        )
+
+        client = MlflowClient(
+            tracking_uri=config.MLFLOW_TRACKING_URI
+        )
+
+        # Record useful information against this specific version.
+        client.set_model_version_tag(
+            name=config.REGISTERED_MODEL,
+            version=registered_version.version,
+            key="dataset_version",
+            value=dataset_version,
+        )
+
+        client.set_model_version_tag(
+            name=config.REGISTERED_MODEL,
+            version=registered_version.version,
+            key="validation_status",
+            value="passed",
+        )
+
+        client.set_model_version_tag(
+            name=config.REGISTERED_MODEL,
+            version=registered_version.version,
+            key="test_defect_recall",
+            value=f"{test_metrics['defect_recall']:.4f}",
+        )
+
+        client.set_model_version_tag(
+            name=config.REGISTERED_MODEL,
+            version=registered_version.version,
+            key="test_defect_f1",
+            value=f"{test_metrics['defect_f1']:.4f}",
+        )
+
+        # Promote this version by assigning the production alias.
+        client.set_registered_model_alias(
+            name=config.REGISTERED_MODEL,
+            alias=config.PRODUCTION_ALIAS,
+            version=registered_version.version,
+        )
+
+        production_version = (
+            client.get_model_version_by_alias(
+                name=config.REGISTERED_MODEL,
+                alias=config.PRODUCTION_ALIAS,
+            )
+        )
+
+        # Save the model metadata, including training parameters, best epoch, and best validation F1 score, test metrics
+        # registered model details and production alias to a JSON file for reference.
+        model_metadata = {
+            "mlflow_run_id": run.info.run_id,
+            "dataset_version":
+                dataset_version,
+            "random_seed":
+                config.RANDOM_SEED,
+            "device": config.DEVICE,
+            "training_images":
+                len(train_items),
+            "validation_images":
+                len(val_items),
+            "test_images": 
+                len(test_items),
+            "batch_size":
+                config.BATCH_SIZE,
+            "epochs_requested":
+                config.EPOCHS,
+            "epochs_completed":
+                len(history),
+            "best_epoch":
+                best_epoch,
+            "best_val_f1":
+                best_val_f1,
+            "learning_rate":
+                config.LEARNING_RATE,
+            "weight_decay":
+                config.WEIGHT_DECAY,
+            "class_weights":
+                weights.cpu().tolist(),
+            "test_metrics": 
+                test_metrics,
+            "registered_model": 
+                config.REGISTERED_MODEL,
+            "registered_model_version":
+                str(registered_version.version),
+            "production_alias":
+                config.PRODUCTION_ALIAS,
+            "production_model_uri": (
+                f"models:/{config.REGISTERED_MODEL}"
+                f"@{config.PRODUCTION_ALIAS}"
+            ),
+            "history": history,
+        }
+
+        # Save the model metadata to a JSON file for reference, allowing for reproducibility and tracking of training parameters and results.
+        config.MODEL_META_PATH.write_text(
+            json.dumps(
+                model_metadata,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+
+        mlflow.set_tags(
+            {
+                "registered_model":
+                    config.REGISTERED_MODEL,
+                "registered_model_version":
+                    str(registered_version.version),
+                "deployment_alias":
+                    config.PRODUCTION_ALIAS,
+            }
         )
 
         # Log the model metadata and model checkpoint files as artifacts in MLflow for tracking and reproducibility.
@@ -627,6 +841,34 @@ def main() -> int:
         print(
             "MLflow model URI:",
             f"runs:/{run.info.run_id}/model",
+        )
+
+        print(
+            "Registered model:",
+                config.REGISTERED_MODEL,
+        )
+
+        print(
+            "Registered model version:",
+                registered_version.version,
+        )
+
+        print(
+            "Production alias:",
+                config.PRODUCTION_ALIAS,
+        )
+
+        print(
+            "Production alias points to version:",
+               production_version.version,
+        )
+
+        print(
+            "Production model URI:",
+            (
+                f"models:/{config.REGISTERED_MODEL}"
+                f"@{config.PRODUCTION_ALIAS}"
+            ),
         )
 
     print(f"Best epoch: {best_epoch}")
