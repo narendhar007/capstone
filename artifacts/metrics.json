@@ -1,0 +1,187 @@
+{
+  "mlflow_run_id": "28ad62368d334e1886ba844df024ba5d",
+  "dataset_version": "v1",
+  "positive_class": "def_front",
+  "test_samples": 58,
+  "accuracy": 0.6896551724137931,
+  "defect_precision": 0.7391304347826086,
+  "defect_recall": 0.85,
+  "defect_f1": 0.7906976744186046,
+  "macro_f1": 0.5953488372093023,
+  "roc_auc": 0.6680555555555556,
+  "confusion_matrix": [
+    [
+      6,
+      12
+    ],
+    [
+      6,
+      34
+    ]
+  ],
+  "misclassified_count": 18,
+  "failure_cases": [
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1137.jpeg",
+      "file_name": "cast_ok_0_1137.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.6535694003105164,
+      "predicted_confidence": 0.6535694003105164
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1173.jpeg",
+      "file_name": "cast_ok_0_1173.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.6415804624557495,
+      "predicted_confidence": 0.6415804624557495
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1180.jpeg",
+      "file_name": "cast_ok_0_1180.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.6335707306861877,
+      "predicted_confidence": 0.6335707306861877
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1134.jpeg",
+      "file_name": "cast_ok_0_1134.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.5593986511230469,
+      "predicted_confidence": 0.5593986511230469
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1160.jpeg",
+      "file_name": "cast_ok_0_1160.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.5533910989761353,
+      "predicted_confidence": 0.5533910989761353
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\def_front\\cast_def_0_1376.jpeg",
+      "file_name": "cast_def_0_1376.jpeg",
+      "true_label": "def_front",
+      "predicted_label": "ok_front",
+      "error_type": "false_negative",
+      "p_defect": 0.44930532574653625,
+      "predicted_confidence": 0.5506946742534637
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_10.jpeg",
+      "file_name": "cast_ok_0_10.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.5489522218704224,
+      "predicted_confidence": 0.5489522218704224
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1172.jpeg",
+      "file_name": "cast_ok_0_1172.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.5424419641494751,
+      "predicted_confidence": 0.5424419641494751
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\def_front\\cast_def_0_1134.jpeg",
+      "file_name": "cast_def_0_1134.jpeg",
+      "true_label": "def_front",
+      "predicted_label": "ok_front",
+      "error_type": "false_negative",
+      "p_defect": 0.4654853343963623,
+      "predicted_confidence": 0.5345146656036377
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1145.jpeg",
+      "file_name": "cast_ok_0_1145.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.5343223810195923,
+      "predicted_confidence": 0.5343223810195923
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1174.jpeg",
+      "file_name": "cast_ok_0_1174.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.5297557711601257,
+      "predicted_confidence": 0.5297557711601257
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\def_front\\cast_def_0_1191.jpeg",
+      "file_name": "cast_def_0_1191.jpeg",
+      "true_label": "def_front",
+      "predicted_label": "ok_front",
+      "error_type": "false_negative",
+      "p_defect": 0.4730149805545807,
+      "predicted_confidence": 0.5269850194454193
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\def_front\\cast_def_0_1324.jpeg",
+      "file_name": "cast_def_0_1324.jpeg",
+      "true_label": "def_front",
+      "predicted_label": "ok_front",
+      "error_type": "false_negative",
+      "p_defect": 0.48128825426101685,
+      "predicted_confidence": 0.5187117457389832
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1170.jpeg",
+      "file_name": "cast_ok_0_1170.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.512755274772644,
+      "predicted_confidence": 0.512755274772644
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1141.jpeg",
+      "file_name": "cast_ok_0_1141.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.5123580098152161,
+      "predicted_confidence": 0.5123580098152161
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\def_front\\cast_def_0_1239.jpeg",
+      "file_name": "cast_def_0_1239.jpeg",
+      "true_label": "def_front",
+      "predicted_label": "ok_front",
+      "error_type": "false_negative",
+      "p_defect": 0.48798656463623047,
+      "predicted_confidence": 0.5120134353637695
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\ok_front\\cast_ok_0_1169.jpeg",
+      "file_name": "cast_ok_0_1169.jpeg",
+      "true_label": "ok_front",
+      "predicted_label": "def_front",
+      "error_type": "false_positive",
+      "p_defect": 0.5081289410591125,
+      "predicted_confidence": 0.5081289410591125
+    },
+    {
+      "path": "C:\\Users\\naren\\Downloads\\casting_data\\test\\def_front\\cast_def_0_1171.jpeg",
+      "file_name": "cast_def_0_1171.jpeg",
+      "true_label": "def_front",
+      "predicted_label": "ok_front",
+      "error_type": "false_negative",
+      "p_defect": 0.49729040265083313,
+      "predicted_confidence": 0.5027095973491669
+    }
+  ]
+}
