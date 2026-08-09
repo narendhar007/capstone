@@ -1,0 +1,73 @@
+{
+  "mlflow_run_id": "28ad62368d334e1886ba844df024ba5d",
+  "dataset_version": "v1",
+  "random_seed": 42,
+  "device": "cpu",
+  "training_images": 68,
+  "validation_images": 12,
+  "test_images": 58,
+  "batch_size": 32,
+  "epochs_requested": 4,
+  "epochs_completed": 4,
+  "best_epoch": 2,
+  "best_val_f1": 0.8571428571428571,
+  "learning_rate": 0.001,
+  "weight_decay": 0.0001,
+  "class_weights": [
+    1.0,
+    1.0
+  ],
+  "test_metrics": {
+    "test_samples": 58,
+    "accuracy": 0.6896551724137931,
+    "defect_precision": 0.7391304347826086,
+    "defect_recall": 0.85,
+    "defect_f1": 0.7906976744186046,
+    "macro_f1": 0.5953488372093023,
+    "roc_auc": 0.6680555555555556,
+    "confusion_matrix": [
+      [
+        6,
+        12
+      ],
+      [
+        6,
+        34
+      ]
+    ]
+  },
+  "registered_model": "casting_defect_classifier",
+  "registered_model_version": "1",
+  "production_alias": "production",
+  "production_model_uri": "models:/casting_defect_classifier@production",
+  "history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.6807022550526787,
+      "train_f1": 0.5151515151515151,
+      "val_loss": 0.6380228400230408,
+      "val_f1": 0.2857142857142857
+    },
+    {
+      "epoch": 2,
+      "train_loss": 0.7367575414040509,
+      "train_f1": 0.25,
+      "val_loss": 0.6116312146186829,
+      "val_f1": 0.8571428571428571
+    },
+    {
+      "epoch": 3,
+      "train_loss": 0.6346319072386798,
+      "train_f1": 0.6031746031746031,
+      "val_loss": 0.676600992679596,
+      "val_f1": 0.6666666666666666
+    },
+    {
+      "epoch": 4,
+      "train_loss": 0.6626196117962108,
+      "train_f1": 0.6966292134831461,
+      "val_loss": 0.696141242980957,
+      "val_f1": 0.6666666666666666
+    }
+  ]
+}

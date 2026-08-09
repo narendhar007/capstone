@@ -117,13 +117,9 @@ def health() -> dict:
 
     # Return a dictionary with the service status and model information.
     return {
-        "status": (
-            "healthy"
-            if model_loaded
-            else "unavailable"
-        ),
+        "status": "ok",
         "model_loaded": model_loaded,
-        "classes": config.CLASSES,
+        "classes": config.CLASS_TO_IDX,
         "positive_class": config.POSITIVE_CLASS,
         "dataset_version": metadata.get(
             "dataset_version"
@@ -145,7 +141,6 @@ def health() -> dict:
             {},
         ),
     }
-    raise NotImplementedError
 
 
 @app.post("/predict")

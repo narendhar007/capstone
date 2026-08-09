@@ -16,3 +16,5 @@ pytest==8.4.2
 # notebooks
 jupyter
 nbconvert
+#pinning for nltk reproducibility
+nltk==3.10.0

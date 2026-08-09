@@ -45,13 +45,18 @@ def _subsample(items, cap):
     include every class, the original items are returned.
     """
     items = list(items)
+
+    # Extract the labels from the items to facilitate stratified sampling.
     labels = [
         label
         for _, label in items
     ]
 
+    # Create a set of unique class labels to determine the number of classes present in the dataset.
     classes = set(labels)
 
+    # Check if the cap is valid for stratified sampling. If the cap is zero, larger than the dataset, 
+    # or too small to include every class, return the original items without subsampling.
     if (
         not cap
         or cap >= len(items)
@@ -59,6 +64,7 @@ def _subsample(items, cap):
     ):
         return items
 
+    # Use train_test_split to perform stratified sampling of the items based on their labels.
     selected_items, _ = train_test_split(
         items,
         train_size=cap,
@@ -67,8 +73,6 @@ def _subsample(items, cap):
     )
 
     return selected_items
-
-    raise NotImplementedError
 
 
 def class_weights(items) -> torch.Tensor:
@@ -329,7 +333,6 @@ def main() -> int:
     )
 
     # Load the test items from the dataset split manifest for evaluation after training.
-
     test_items = data_prep.load_split(
         dataset_version,
         "test",
