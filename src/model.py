@@ -16,7 +16,7 @@ import config
 
 from torchvision.models import ResNet18_Weights, resnet18
 
-def build_model(freeze: bool | None = None) -> nn.Module:
+def build_model(freeze: bool | None = None, pretrained: bool = True,) -> nn.Module:
     # TODO 2: load torchvision resnet18 with ImageNet weights; if freeze, set
     #         requires_grad=False on backbone params; replace net.fc with a
     #         nn.Linear(in_features, config.NUM_CLASSES) trainable head.
@@ -28,9 +28,15 @@ def build_model(freeze: bool | None = None) -> nn.Module:
     if freeze is None:
         freeze = config.FREEZE_BACKBONE
 
+    weights = (
+        ResNet18_Weights.IMAGENET1K_V1
+        if pretrained
+        else None
+    )
+
     # Use a fixed ImageNet weight version for reproducibility.
     net = resnet18(
-        weights=ResNet18_Weights.IMAGENET1K_V1
+        weights=weights
     )
 
     # If freeze is True, freeze the backbone parameters (requires_grad=False).
@@ -40,13 +46,14 @@ def build_model(freeze: bool | None = None) -> nn.Module:
 
     # Replace the original 1000-class ImageNet head.
     input_features = net.fc.in_features
+
+    # Replace the final fully connected layer with a new linear layer for 2-class classification.
     net.fc = nn.Linear(
         input_features,
         config.NUM_CLASSES,
     )
 
     return net
-    raise NotImplementedError("Build the ResNet18 transfer-learning model")
 
 
 def trainable_parameters(net: nn.Module):
@@ -70,7 +77,26 @@ def save_model(net: nn.Module, path: Path | None = None) -> None:
 
 
 def load_model(path: Path | None = None, freeze: bool = True) -> nn.Module:
-    net = build_model(freeze=freeze)
-    net.load_state_dict(torch.load(path or config.MODEL_PATH, map_location=config.DEVICE))
+    """
+    Load trained model weights without downloading ImageNet weights.
+
+    """
+    # load the model path from the argument or the default config path
+    model_path = path or config.MODEL_PATH
+
+    # build the model architecture with the specified freeze option and without pretrained weights
+    net = build_model(freeze=freeze,pretrained=False,)
+
+    # load the state dictionary from the specified model path, mapping it to the appropriate device
+    state_dict = torch.load(
+        model_path,
+        map_location=config.DEVICE,
+        weights_only=True,
+    )
+
+    # load the state dictionary into the model
+    net.load_state_dict(state_dict)
+    net.to(config.DEVICE)
     net.eval()
+
     return net
