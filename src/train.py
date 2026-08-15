@@ -34,6 +34,31 @@ def set_seed(seed: int = config.RANDOM_SEED) -> None:
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
 
+def mlflow_tracking_uri() -> str:
+    """
+    Return the reproducible local MLflow SQLite tracking URI.
+
+    The database is kept inside the generated mlruns directory so
+    training and retraining always use the same tracking/registry store.
+    """
+
+    db_path = (
+        config.MLRUNS_DIR
+        / "mlflow.db"
+    )
+
+    db_path.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    return (
+        "sqlite:///"
+        + db_path
+        .resolve()
+        .as_posix()
+    )
+
 def _subsample(items, cap):
     # TODO: stratified subsample to `cap` (or return items if cap falsy/too small).
 
@@ -293,10 +318,175 @@ def train_model( net, train_loader, val_loader, loss_function, optimizer, log_to
     # Return the training history, the epoch with the best validation F1 score, and the best validation F1 score itself.
     return history, best_epoch, best_val_f1
 
+import pandas as pd
+from PIL import Image
+
 def save_reference_baseline(net, ref_items) -> dict:
     # TODO 4: save reference_features.csv + reference_embeddings.npz for clean ref images.
 
-    raise NotImplementedError
+    import pandas as pd
+    from PIL import Image
+
+    """
+    Save the clean reference baseline used for production drift monitoring.
+
+    Outputs:
+      - reference_features.csv
+      - reference_embeddings.npz
+    """
+
+    # Set the model to evaluation mode to ensure that layers like dropout and batch normalization behave correctly during inference.
+    net.eval()
+
+    feature_rows = []
+
+    # ---------------------------------------------------------
+    # Human-interpretable image features.
+    # ---------------------------------------------------------
+
+    # Iterate over the reference items, which consist of image paths and their corresponding labels.
+    for image_path, label in ref_items:
+
+        # Open the image using PIL's Image module, convert it to grayscale (L mode), and create a copy of the image for further processing.
+        with Image.open(image_path) as opened_image:
+            image = (
+                opened_image
+                .convert("L")
+                .copy()
+            )
+
+        # Extract human-interpretable image features using the data_prep.image_features function.
+        features = data_prep.image_features(
+            image
+        )
+
+        # Append a dictionary containing the image filename, label, class name, and extracted features to the feature_rows list.
+        feature_rows.append(
+            {
+                "filename": image_path.name,
+                "label": int(label),
+                "class_name":
+                    config.IDX_TO_CLASS[label],
+                **features,
+            }
+        )
+
+    # Create a pandas DataFrame from the list of feature dictionaries, which will be used to save the reference features to a CSV file.
+    reference_features = pd.DataFrame(
+        feature_rows
+    )
+
+    # Define the path to save the reference features CSV file in the artifact directory specified in the configuration.
+    reference_features_path = (
+        config.ARTIFACT_DIR
+        / "reference_features.csv"
+    )
+
+    # Save the reference features DataFrame to a CSV file without including the index column, allowing for 
+    # easy inspection and analysis of the extracted features.
+    reference_features.to_csv(
+        reference_features_path,
+        index=False,
+    )
+
+    # ---------------------------------------------------------
+    # 512-D model embeddings.
+    # ---------------------------------------------------------
+
+    # Create a DataLoader for the reference items using the CastingDataset class, which handles batching and parallel data loading.
+    reference_loader = DataLoader(
+        CastingDataset(
+            ref_items,
+            train=False,
+        ),
+        batch_size=config.BATCH_SIZE,
+        shuffle=False,
+        num_workers=config.NUM_WORKERS,
+    )
+
+    # Create an instance of the EmbeddingExtractor class, which wraps the trained model and extracts embeddings from the input images.
+    extractor = EmbeddingExtractor(
+        net
+    ).to(
+        config.DEVICE
+    )
+
+    # Set the embedding extractor to evaluation mode to ensure that layers like dropout and batch normalization 
+    # behave correctly during inference.
+    extractor.eval()
+
+    embedding_batches = []
+
+    # Use torch.no_grad() to disable gradient computation during the embedding extraction process, which reduces 
+    # memory usage and speeds up inference.
+    with torch.no_grad():
+
+        # Iterate over the reference DataLoader to process batches of images and extract their embeddings using the trained model.
+        for images, _ in reference_loader:
+
+            images = images.to(
+                config.DEVICE
+            )
+
+            embeddings = extractor(
+                images
+            )
+
+            embedding_batches.append(
+                embeddings
+                .cpu()
+                .numpy()
+            )
+
+    # Concatenate the extracted embeddings from all batches into a single NumPy array, which will be used to compute the reference 
+    # centroid and save the embeddings to a compressed file.
+    reference_embeddings = np.concatenate(
+        embedding_batches,
+        axis=0,
+    )
+
+    # Ensure that the shape of the reference embeddings matches the expected embedding dimension specified in the configuration.
+    assert reference_embeddings.shape[1] == (
+        config.EMBEDDING_DIM
+    )
+
+    # Calculate the centroid of the reference embeddings by taking the mean across all embeddings along the first axis.
+    reference_centroid = (
+        reference_embeddings.mean(
+            axis=0
+        )
+    )
+
+    # Save the reference embeddings and centroid to a compressed NumPy file (.npz) for efficient storage and retrieval.
+    np.savez_compressed(
+        config.REFERENCE_EMBED,
+        embeddings=reference_embeddings,
+        centroid=reference_centroid,
+    )
+
+    # Create a summary dictionary containing information about the reference samples, features path, embeddings path, 
+    # and embedding shape for logging and reference purposes.
+    summary = {
+        "reference_samples":
+            len(ref_items),
+
+        "features_path":
+            str(
+                reference_features_path
+            ),
+
+        "embeddings_path":
+            str(
+                config.REFERENCE_EMBED
+            ),
+
+        "embedding_shape":
+            list(
+                reference_embeddings.shape
+            ),
+    }
+
+    return summary
 
 
 def main() -> int:
@@ -407,8 +597,11 @@ def main() -> int:
     )
 
     # Set the MLflow tracking URI and experiment name for logging training parameters, metrics, and models.
+
+    tracking_uri = mlflow_tracking_uri()
+
     mlflow.set_tracking_uri(
-        config.MLFLOW_TRACKING_URI
+        tracking_uri
     )
 
     mlflow.set_experiment(
@@ -641,6 +834,61 @@ def main() -> int:
         # any layers like dropout or batch normalization behave correctly during inference.
         net.eval()
 
+        # Save the reference baseline, which includes human-interpretable image features and model embeddings for clean reference images.
+        # This baseline will be used for drift monitoring in production.
+        reference_baseline = save_reference_baseline(
+            net,
+            val_items,
+        )
+
+        print(
+            "\nReference monitoring baseline"
+        )
+
+        print(
+            "Reference samples:",
+            reference_baseline[
+                "reference_samples"
+            ],
+        )
+
+        print(
+            "Reference feature file:",
+            reference_baseline[
+                "features_path"
+            ],
+        )
+
+        print(
+            "Reference embedding file:",
+            reference_baseline[
+                "embeddings_path"
+            ],
+        )
+
+        print(
+            "Embedding shape:",
+            reference_baseline[
+                "embedding_shape"
+            ],
+        )
+
+        # Log the reference features CSV file and reference embeddings NPZ file as artifacts in MLflow for tracking and reproducibility.
+        mlflow.log_artifact(
+            str(
+                config.ARTIFACT_DIR
+                / "reference_features.csv"
+            ),
+            artifact_path="monitoring_baseline",
+        )
+
+        mlflow.log_artifact(
+            str(
+                config.REFERENCE_EMBED
+            ),
+            artifact_path="monitoring_baseline",
+        )
+
         # Create a dummy input example for the model, which is a zero tensor with the shape
         # expected by the model (batch size of 1, 3 color channels, and the configured image size).
         # This input example is used for logging the model signature in MLflow.
@@ -690,7 +938,7 @@ def main() -> int:
         )
 
         client = MlflowClient(
-            tracking_uri=config.MLFLOW_TRACKING_URI
+            tracking_uri=tracking_uri
         )
 
         # Record useful information against this specific version.

@@ -199,7 +199,6 @@ def compute_metrics(y_true, y_pred, y_prob) -> dict:
         "roc_auc": roc_auc,
         "confusion_matrix": matrix.tolist(),
     }
-    raise NotImplementedError
 
 
 def plot_eval(y_true, y_pred, y_prob, out: Path | None = None) -> Path:

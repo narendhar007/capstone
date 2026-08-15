@@ -65,11 +65,30 @@ class EmbeddingExtractor(nn.Module):
     def __init__(self, net: nn.Module):
         super().__init__()
         # TODO 4 (embedding drift): keep all layers except the final fc.
-        raise NotImplementedError("Wrap the backbone to output pre-fc embeddings")
+        # ResNet18 children end with:
+        # avgpool -> fc
+        # Keep everything through avgpool and remove fc.
+        self.features = nn.Sequential(
+            *list(net.children())[:-1]
+        )
 
-    @torch.no_grad()
+        self.features.eval() #To stop the network from training when extracting embeddings
+
+    @torch.no_grad() # To prevent gradient computation during embedding extraction
+
     def forward(self, x):
-        raise NotImplementedError
+        # forward pass through the feature extractor to obtain embeddings
+        embeddings = self.features(x) 
+
+        # ResNet output before fc is:
+        # [batch, 512, 1, 1]
+        # Flatten to [batch, 512].
+        embeddings = torch.flatten(
+            embeddings,
+            1,
+        )
+
+        return embeddings
 
 
 def save_model(net: nn.Module, path: Path | None = None) -> None:

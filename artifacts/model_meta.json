@@ -1,5 +1,5 @@
 {
-  "mlflow_run_id": "28ad62368d334e1886ba844df024ba5d",
+  "mlflow_run_id": "1d0a731ad776488ab782a8cc02e293ad",
   "dataset_version": "v1",
   "random_seed": 42,
   "device": "cpu",
@@ -10,64 +10,80 @@
   "epochs_requested": 4,
   "epochs_completed": 4,
   "best_epoch": 2,
-  "best_val_f1": 0.8571428571428571,
+  "best_val_f1": 0.75,
   "learning_rate": 0.001,
   "weight_decay": 0.0001,
   "class_weights": [
     1.0,
     1.0
   ],
-  "test_metrics": {
-    "test_samples": 58,
-    "accuracy": 0.6896551724137931,
-    "defect_precision": 0.7391304347826086,
-    "defect_recall": 0.85,
-    "defect_f1": 0.7906976744186046,
-    "macro_f1": 0.5953488372093023,
-    "roc_auc": 0.6680555555555556,
-    "confusion_matrix": [
-      [
-        6,
-        12
-      ],
-      [
-        6,
-        34
-      ]
-    ]
-  },
   "registered_model": "casting_defect_classifier",
-  "registered_model_version": "1",
+  "registered_model_version": "2",
   "production_alias": "production",
   "production_model_uri": "models:/casting_defect_classifier@production",
   "history": [
     {
       "epoch": 1,
-      "train_loss": 0.6807022550526787,
-      "train_f1": 0.5151515151515151,
-      "val_loss": 0.6380228400230408,
-      "val_f1": 0.2857142857142857
+      "train_loss": 0.6522067785263062,
+      "train_f1": 0.6129032258064516,
+      "val_loss": 0.7331283092498779,
+      "val_f1": 0.6666666666666666
     },
     {
       "epoch": 2,
-      "train_loss": 0.7367575414040509,
-      "train_f1": 0.25,
-      "val_loss": 0.6116312146186829,
-      "val_f1": 0.8571428571428571
+      "train_loss": 0.6771072184338289,
+      "train_f1": 0.4444444444444444,
+      "val_loss": 0.6762592196464539,
+      "val_f1": 0.75
     },
     {
       "epoch": 3,
-      "train_loss": 0.6346319072386798,
-      "train_f1": 0.6031746031746031,
-      "val_loss": 0.676600992679596,
+      "train_loss": 0.654329447185292,
+      "train_f1": 0.24390243902439024,
+      "val_loss": 0.7736757397651672,
       "val_f1": 0.6666666666666666
     },
     {
       "epoch": 4,
-      "train_loss": 0.6626196117962108,
-      "train_f1": 0.6966292134831461,
-      "val_loss": 0.696141242980957,
+      "train_loss": 0.5971276549731984,
+      "train_f1": 0.7631578947368421,
+      "val_loss": 0.9182054400444031,
       "val_f1": 0.6666666666666666
     }
-  ]
+  ],
+  "promotion_source": "drift_retraining",
+  "drifted_test_metrics": {
+    "test_samples": 58,
+    "accuracy": 0.6896551724137931,
+    "defect_precision": 0.6896551724137931,
+    "defect_recall": 1.0,
+    "defect_f1": 0.8163265306122449,
+    "macro_f1": 0.40816326530612246,
+    "roc_auc": 0.6194444444444445,
+    "confusion_matrix": [
+      [
+        0,
+        18
+      ],
+      [
+        0,
+        40
+      ]
+    ]
+  },
+  "reference_baseline": {
+    "reference_samples": 12,
+    "features_path": "C:\\Users\\naren\\Documents\\MLOps-Capstone\\capstone\\artifacts\\reference_features.csv",
+    "embeddings_path": "C:\\Users\\naren\\Documents\\MLOps-Capstone\\capstone\\artifacts\\reference_embeddings.npz",
+    "embedding_shape": [
+      12,
+      512
+    ]
+  },
+  "promotion_comparison": {
+    "previous_production_version": "1",
+    "production_drifted_f1": 0.7916666666666666,
+    "candidate_drifted_f1": 0.8163265306122449,
+    "promotion_epsilon": 0.01
+  }
 }

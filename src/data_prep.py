@@ -97,7 +97,6 @@ def find_data_root(base: Path | None = None) -> Path:
         f"{search_base}. Expected train/test directories containing "
         "ok_front and def_front class folders."
     )
-    raise NotImplementedError("Locate the casting train/test root")
 
 
 def list_images(split_dir: Path) -> list[tuple[Path, int]]:
@@ -208,7 +207,8 @@ def validate_quality(root: Path) -> dict:
                         # into an image array for modelling.
                         image.verify()
 
-                    # Check if the actual dimensions of the image match the expected dimensions (300 x 300). If not, add the image details to the list of invalid dimensions.
+                    # Check if the actual dimensions of the image match the expected dimensions (300 x 300). If not, add the image details 
+                    # to the list of invalid dimensions.
                     if actual_dimensions != expected_dimensions:
                         invalid_dimensions.append(
                             {
@@ -240,6 +240,9 @@ def validate_quality(root: Path) -> dict:
     cross_split_duplicates: list[dict] = []
     cross_class_duplicates: list[dict] = []
 
+    # Iterate over the hash_to_paths dictionary to identify duplicate images based on their MD5 content hash. 
+    # For each hash, if there are multiple relative paths associated with it, create a record of the duplicate group 
+    # and check for cross-split and cross-class duplicates.
     for digest, relative_paths in sorted(hash_to_paths.items()):
         if len(relative_paths) < 2:
             continue
@@ -450,7 +453,6 @@ def validate_quality(root: Path) -> dict:
         "failure_reasons": failure_reasons,
         "passed": passed,
     }
-    raise NotImplementedError("Implement data-quality validation")
 
 
 def build_splits(root: Path, version: str = "v1") -> dict:
@@ -873,7 +875,7 @@ def build_splits(root: Path, version: str = "v1") -> dict:
     )
 
     return metadata    
-    raise NotImplementedError("Build versioned stratified splits + metadata")
+    
 
 
 def load_split(version: str, name: str, root: Path) -> list[tuple[Path, int]]:
@@ -946,7 +948,6 @@ def get_transforms(train: bool):
     )
 
     return transforms.Compose(steps)
-    raise NotImplementedError("Define the train/eval transforms")
 
 
 def image_features(img: Image.Image) -> dict:
@@ -990,4 +991,4 @@ def image_features(img: Image.Image) -> dict:
         name: features[name]
         for name in config.DRIFT_FEATURES
     }
-    raise NotImplementedError("Extract per-image drift features")
+    
