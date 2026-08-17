@@ -1,6 +1,6 @@
 {
   "version_id": "v1",
-  "created_at_utc": "2026-08-04T10:31:24.843884+00:00",
+  "created_at_utc": "2026-08-17T03:31:42.776962+00:00",
   "random_seed": 42,
   "validation_fraction": 0.15,
   "class_to_idx": {
@@ -10,17 +10,17 @@
   "positive_class": "def_front",
   "positive_class_index": 1,
   "split_policy": "prefer_train_remove_test_hash_overlap_v1",
-  "source_inventory_sha256": "a504579a5a8e84c39a0f563112496693f1d077a42d39643e2e6c9693b74e1b27",
+  "source_inventory_sha256": "4141dc41b837f9814b1796424dcf49f8f7e1d4a120c0e389d5915181e4c45386",
   "source_summary": {
-    "total_images": 160,
-    "supplied_train_size": 80,
-    "supplied_test_size": 80
+    "total_images": 7348,
+    "supplied_train_size": 6633,
+    "supplied_test_size": 715
   },
   "duplicate_handling": {
     "hash_algorithm": "md5",
     "policy": "Retain one representative per hash in the supplied training data. Remove test images whose hash occurs in training. Retain one representative per remaining test hash.",
-    "cross_split_duplicate_group_count": 22,
-    "cross_split_test_files_excluded": 22,
+    "cross_split_duplicate_group_count": 64,
+    "cross_split_test_files_excluded": 64,
     "within_train_duplicates_removed": 0,
     "within_test_duplicates_removed": 0,
     "excluded_test_files": [
@@ -45,41 +45,83 @@
       "test/ok_front/cast_ok_0_1096.jpeg",
       "test/ok_front/cast_ok_0_1120.jpeg",
       "test/ok_front/cast_ok_0_1121.jpeg",
-      "test/ok_front/cast_ok_0_1127.jpeg"
+      "test/ok_front/cast_ok_0_1127.jpeg",
+      "test/ok_front/cast_ok_0_1132.jpeg",
+      "test/ok_front/cast_ok_0_1134.jpeg",
+      "test/ok_front/cast_ok_0_1137.jpeg",
+      "test/ok_front/cast_ok_0_1140.jpeg",
+      "test/ok_front/cast_ok_0_1144.jpeg",
+      "test/ok_front/cast_ok_0_1160.jpeg",
+      "test/ok_front/cast_ok_0_1165.jpeg",
+      "test/ok_front/cast_ok_0_1169.jpeg",
+      "test/ok_front/cast_ok_0_1171.jpeg",
+      "test/ok_front/cast_ok_0_1172.jpeg",
+      "test/ok_front/cast_ok_0_1173.jpeg",
+      "test/ok_front/cast_ok_0_1176.jpeg",
+      "test/ok_front/cast_ok_0_1180.jpeg",
+      "test/ok_front/cast_ok_0_1200.jpeg",
+      "test/ok_front/cast_ok_0_1202.jpeg",
+      "test/ok_front/cast_ok_0_1203.jpeg",
+      "test/ok_front/cast_ok_0_1207.jpeg",
+      "test/ok_front/cast_ok_0_1209.jpeg",
+      "test/ok_front/cast_ok_0_1210.jpeg",
+      "test/ok_front/cast_ok_0_1213.jpeg",
+      "test/ok_front/cast_ok_0_1218.jpeg",
+      "test/ok_front/cast_ok_0_863.jpeg",
+      "test/ok_front/cast_ok_0_864.jpeg",
+      "test/ok_front/cast_ok_0_869.jpeg",
+      "test/ok_front/cast_ok_0_880.jpeg",
+      "test/ok_front/cast_ok_0_897.jpeg",
+      "test/ok_front/cast_ok_0_903.jpeg",
+      "test/ok_front/cast_ok_0_904.jpeg",
+      "test/ok_front/cast_ok_0_907.jpeg",
+      "test/ok_front/cast_ok_0_925.jpeg",
+      "test/ok_front/cast_ok_0_927.jpeg",
+      "test/ok_front/cast_ok_0_932.jpeg",
+      "test/ok_front/cast_ok_0_935.jpeg",
+      "test/ok_front/cast_ok_0_937.jpeg",
+      "test/ok_front/cast_ok_0_942.jpeg",
+      "test/ok_front/cast_ok_0_952.jpeg",
+      "test/ok_front/cast_ok_0_960.jpeg",
+      "test/ok_front/cast_ok_0_973.jpeg",
+      "test/ok_front/cast_ok_0_975.jpeg",
+      "test/ok_front/cast_ok_0_976.jpeg",
+      "test/ok_front/cast_ok_0_989.jpeg",
+      "test/ok_front/cast_ok_0_998.jpeg"
     ]
   },
   "split_info": {
     "train": {
-      "size": 68,
+      "size": 5638,
       "class_counts": {
-        "ok_front": 34,
-        "def_front": 34
+        "ok_front": 2444,
+        "def_front": 3194
       },
       "class_percentages": {
-        "ok_front": 50.0,
-        "def_front": 50.0
+        "ok_front": 43.35,
+        "def_front": 56.65
       }
     },
     "val": {
-      "size": 12,
+      "size": 995,
       "class_counts": {
-        "ok_front": 6,
-        "def_front": 6
+        "ok_front": 431,
+        "def_front": 564
       },
       "class_percentages": {
-        "ok_front": 50.0,
-        "def_front": 50.0
+        "ok_front": 43.32,
+        "def_front": 56.68
       }
     },
     "test": {
-      "size": 58,
+      "size": 651,
       "class_counts": {
-        "ok_front": 18,
-        "def_front": 40
+        "ok_front": 198,
+        "def_front": 453
       },
       "class_percentages": {
-        "ok_front": 31.03,
-        "def_front": 68.97
+        "ok_front": 30.41,
+        "def_front": 69.59
       }
     }
   },
@@ -95,8 +137,8 @@
     "test": "test.json"
   },
   "manifest_sha256": {
-    "train": "73fc01713edd9b14452ffe3048ce1dd494ace1a051516bdeca7b4c7dcbb15ad2",
-    "val": "1c7a749d452d142e390d5babc313bc1fd027537434e6a515010476d58ff4e90a",
-    "test": "3b95b2877d52e70839d86111258cb8aa75faa1b13411c5dd26e4b82c03fc4f4b"
+    "train": "39cafad78151de5102d006ff7a4997dad64f480fc7061a0df71c057a5c1ede71",
+    "val": "71f1e0fd1564ea0bfec464c74ee290d60275e002affcd2a1350075a23bf999a2",
+    "test": "05ff8972a2d3f831946c230b9fc254fa3cec44e1a578ed15b2878de4b2def9dd"
   }
 }

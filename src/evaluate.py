@@ -118,7 +118,6 @@ def predict(net, loader, return_embeddings: bool = False):
         )
 
     return y_true, y_pred, y_prob
-    raise NotImplementedError
 
 
 def compute_metrics(y_true, y_pred, y_prob) -> dict:
@@ -199,7 +198,6 @@ def compute_metrics(y_true, y_pred, y_prob) -> dict:
         "roc_auc": roc_auc,
         "confusion_matrix": matrix.tolist(),
     }
-    raise NotImplementedError
 
 
 def plot_eval(y_true, y_pred, y_prob, out: Path | None = None) -> Path:
@@ -340,13 +338,16 @@ def plot_eval(y_true, y_pred, y_prob, out: Path | None = None) -> Path:
 
     # Return the output path for the saved evaluation plot.
     return output_path
-    raise NotImplementedError
 
 
-def failure_cases(items, y_true, y_pred, y_prob, limit: int = 20) -> list[dict]:
+def failure_cases(items, y_true, y_pred, y_prob, limit: int | None = None) -> list[dict]:
     # TODO 3: list misclassified samples with predicted p_defect (error analysis).
     """
-    Return the most confident incorrect predictions.
+    Return incorrect predictions ordered by predicted confidence.
+
+    When limit is None, return all misclassified samples.
+    Otherwise return the most confident incorrect predictions
+    up to the requested limit.
     """
     # Initialize an empty list to store information about misclassified samples, including their file paths, true labels, 
     # predicted labels, error types, predicted probabilities for the DEFECT class, and predicted confidence scores.
@@ -419,5 +420,7 @@ def failure_cases(items, y_true, y_pred, y_prob, limit: int = 20) -> list[dict]:
     )
 
     # Return a limited number of the most confident incorrect predictions based on the specified limit.
+    if limit is None:
+        return errors
+
     return errors[:limit]
-    raise NotImplementedError

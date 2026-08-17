@@ -55,10 +55,13 @@ def find_data_root(base: Path | None = None) -> Path:
         cannot be found.
     """
 
-    search_base = Path(base) if base is not None else config.DATA_DIR #if base is None, use the default data directory from config
-    search_base = search_base.expanduser().resolve() #expanduser() replaces ~ with the user home directory, resolve() returns the absolute path. 
-    #Required as I am using symbolic links for the data directory.
+    #if base is None, use the default data directory from config
+    search_base = Path(base) if base is not None else config.DATA_DIR
 
+    # Convert the search base to an absolute path and resolve any symbolic links or relative components.
+    search_base = search_base.expanduser().resolve()
+
+    # Check if the search base directory exists. If it does not exist, raise a FileNotFoundError with a descriptive message.
     if not search_base.exists():
         raise FileNotFoundError(
             f"Data search directory does not exist: {search_base}"
@@ -74,12 +77,14 @@ def find_data_root(base: Path | None = None) -> Path:
 
     # Helper function to check if a candidate directory is a valid dataset root.
     def is_dataset_root(candidate: Path) -> bool:
+        # Check if all required directories exist under the candidate directory.
         return all(
             (candidate / split / class_name).is_dir()
             for split, class_name in required_directories
         )
 
     # First check whether the configured directory is itself the dataset root.
+    # If it is, return it immediately.
     if is_dataset_root(search_base):
         return search_base
 
@@ -88,6 +93,7 @@ def find_data_root(base: Path | None = None) -> Path:
     for current_directory, _, _ in os.walk(search_base, followlinks=True):
         candidate = Path(current_directory)
 
+        # Check if the current directory is a valid dataset root. If it is, return the resolved path.
         if is_dataset_root(candidate):
             return candidate.resolve()
 
@@ -97,7 +103,6 @@ def find_data_root(base: Path | None = None) -> Path:
         f"{search_base}. Expected train/test directories containing "
         "ok_front and def_front class folders."
     )
-    raise NotImplementedError("Locate the casting train/test root")
 
 
 def list_images(split_dir: Path) -> list[tuple[Path, int]]:
@@ -140,19 +145,25 @@ def validate_quality(root: Path) -> dict:
         JSON-serialisable data-quality report containing detailed issues,
         class distributions, check results and an overall passed flag.
     """
+    # Convert the root path to an absolute path and resolve any symbolic links or relative components.
     root = Path(root).expanduser().resolve()
 
-    if not root.exists(): #if root does not exist, raise a FileNotFoundError with a descriptive message.
+    # Check if the root directory exists. If it does not exist, raise a FileNotFoundError with a descriptive message.
+    if not root.exists(): 
         raise FileNotFoundError(f"Dataset root does not exist: {root}")
 
-    expected_dimensions = (300, 300) # Expected image dimensions
-    expected_splits = ("train", "test") # Expected dataset splits
-    expected_classes = tuple(config.CLASS_TO_IDX.keys()) # Expected class names
+    # Expected image dimensions, dataset splits for validation and class names based on the configuration file.
+    expected_dimensions = (300, 300) 
+    expected_splits = ("train", "test")
+    expected_classes = tuple(config.CLASS_TO_IDX.keys())
 
-    missing_directories: list[str] = [] # List of missing directories
-    empty_directories: list[str] = [] # List of empty directories
-    corrupt_files: list[dict] = [] # List of corrupt files with their paths and error details
-    invalid_dimensions: list[dict] = [] # List of files with invalid dimensions, including their paths, actual and expected dimensions, format, and mode
+    # Initialize lists to record issues found during validation.
+    missing_directories: list[str] = []
+    empty_directories: list[str] = []
+    corrupt_files: list[dict] = []
+
+    # List of files with invalid dimensions, including their paths, actual and expected dimensions, format, and mode
+    invalid_dimensions: list[dict] = []
 
     # Initialize a nested dictionary to count images per split and class.
     split_counts: dict[str, dict[str, int]] = {
@@ -163,13 +174,18 @@ def validate_quality(root: Path) -> dict:
     # Maps an image-content hash to all relative paths sharing that hash.
     hash_to_paths: dict[str, list[str]] = {}
 
-    for split in expected_splits: #for each split (train/test), check for the existence of class directories and process images.
-        for class_name in expected_classes: #for each class (ok_front/def_front), check for the existence of the class directory and process images.
+    # For each split (train/test), check for the existence of class directories and process images.
+    for split in expected_splits:
+
+        # For each class (ok_front/def_front), check for the existence of the class directory and process images.
+        for class_name in expected_classes:
             class_directory = root / split / class_name # Construct the path to the class directory.
             relative_directory = Path(split) / class_name # Construct the relative path for reporting.
 
-            if not class_directory.is_dir(): #if the class directory does not exist, add it to the list of missing directories and continue to the next class.
-                missing_directories.append(relative_directory.as_posix()) #add the relative path of the missing directory to the list of missing directories.
+            # if the class directory does not exist, add it to the list of missing directories and continue to the next class.
+            if not class_directory.is_dir():
+                # add the relative path of the missing directory to the list of missing directories.
+                missing_directories.append(relative_directory.as_posix())
                 continue
 
             image_paths = sorted( #sorted list of image file paths in the class directory, filtered by valid image extensions.
@@ -195,6 +211,9 @@ def validate_quality(root: Path) -> dict:
                     # for duplicate hashing and file verification.
                     image_bytes = image_path.read_bytes()
 
+                    # Compute the MD5 hash of the image bytes to identify duplicates. 
+                    # Store the relative path of the image in the hash_to_paths dictionary, where the key is the MD5 hash 
+                    # and the value is a list of relative paths sharing that hash.
                     digest = hashlib.md5(image_bytes).hexdigest()
                     hash_to_paths.setdefault(digest, []).append(relative_path)
 
@@ -208,7 +227,8 @@ def validate_quality(root: Path) -> dict:
                         # into an image array for modelling.
                         image.verify()
 
-                    # Check if the actual dimensions of the image match the expected dimensions (300 x 300). If not, add the image details to the list of invalid dimensions.
+                    # Check if the actual dimensions of the image match the expected dimensions (300 x 300). If not, add the image details 
+                    # to the list of invalid dimensions.
                     if actual_dimensions != expected_dimensions:
                         invalid_dimensions.append(
                             {
@@ -220,14 +240,16 @@ def validate_quality(root: Path) -> dict:
                             }
                         )
 
-                # Handle exceptions that may occur during image processing, such as unreadable or corrupt files. If an exception is raised, add the image details and error information to the list of corrupt files.
+                # Handle exceptions that may occur during image processing, such as unreadable or corrupt files. 
+                # If an exception is raised, add the image details and error information to the list of corrupt files.
                 except (
                     UnidentifiedImageError,
                     OSError,
                     ValueError,
                     SyntaxError,
                 ) as exc:
-                    # Record the corrupt file details, including its relative path, error type, and error message, in the list of corrupt files.
+                    # Record the corrupt file details, including its relative path, error type, and error message, in the list 
+                    # of corrupt files.
                     corrupt_files.append(
                         {
                             "path": relative_path,
@@ -240,23 +262,34 @@ def validate_quality(root: Path) -> dict:
     cross_split_duplicates: list[dict] = []
     cross_class_duplicates: list[dict] = []
 
+    # Iterate over the hash_to_paths dictionary to identify duplicate images based on their MD5 content hash. 
+    # For each hash, if there are multiple relative paths associated with it, create a record of the duplicate group 
+    # and check for cross-split and cross-class duplicates.
     for digest, relative_paths in sorted(hash_to_paths.items()):
+
+        # If there are fewer than two relative paths for a given hash, it means there are no duplicates for that hash, 
+        # so we skip to the next hash.
         if len(relative_paths) < 2:
             continue
 
+        # Sort the list of relative paths for the current hash to ensure a consistent order for reporting and analysis.
         sorted_paths = sorted(relative_paths)
 
+        # Determine the unique split names (train/test) and class names (ok_front/def_front) associated with the duplicate images.
         split_names = {
             Path(relative_path).parts[0]
             for relative_path in sorted_paths
         }
 
+        # Determine the unique class names associated with the duplicate images.
         class_names = {
             Path(relative_path).parts[1]
             for relative_path in sorted_paths
             if len(Path(relative_path).parts) >= 3
         }
 
+        # Create a record for the duplicate group, including the MD5 hash, file count, list of relative paths, and flags indicating
+        # whether the duplicates cross splits or classes.
         duplicate_record = {
             "md5": digest,
             "file_count": len(sorted_paths),
@@ -265,19 +298,24 @@ def validate_quality(root: Path) -> dict:
             "cross_class": len(class_names) > 1,
         }
 
+        # Append the duplicate record to the list of duplicate groups for further analysis and reporting.
         duplicate_groups.append(duplicate_record)
 
+        # If the duplicate group contains images from multiple splits (train/test), append the record to the cross_split_duplicates list.
         if duplicate_record["cross_split"]:
             cross_split_duplicates.append(duplicate_record)
 
+        # If the duplicate group contains images from multiple classes (ok_front/def_front), append the record to the cross_class_duplicates list.
         if duplicate_record["cross_class"]:
             cross_class_duplicates.append(duplicate_record)
 
+    # Calculate the total number of images in each split by summing the counts of images for each class within that split.
     split_totals = {
         split: sum(split_counts[split].values())
         for split in expected_splits
     }
 
+    # Calculate the overall class counts across all splits by summing the counts of images for each class across all splits.
     overall_class_counts = {
         class_name: sum(
             split_counts[split][class_name]
@@ -290,6 +328,7 @@ def validate_quality(root: Path) -> dict:
 
     class_distribution = {}
 
+    # Calculate the class distribution for each split by computing the count and percentage of images for each class within that split.
     for split in expected_splits:
         split_total = split_totals[split]
 
@@ -321,6 +360,8 @@ def validate_quality(root: Path) -> dict:
         for group in duplicate_groups
     )
 
+    # Determine whether the dataset structure, integrity, dimensions, class distribution, duplicates, leakage, 
+    # and label consistency checks have passed based on the recorded issues.
     structure_passed = (
         len(missing_directories) == 0
         and len(empty_directories) == 0
@@ -342,6 +383,8 @@ def validate_quality(root: Path) -> dict:
 
     label_consistency_passed = len(cross_class_duplicates) == 0
 
+    # Create a dictionary summarizing the results of various checks performed on the dataset, including the status (PASS/FAIL) 
+    # and the count of issues found for each check.
     checks = {
         "required_directories": {
             "status": "PASS" if structure_passed else "FAIL",
@@ -381,6 +424,7 @@ def validate_quality(root: Path) -> dict:
 
     failure_reasons: list[str] = []
 
+    # Append descriptive failure reasons to the failure_reasons list based on the results of the checks performed on the dataset.
     if not structure_passed:
         failure_reasons.append(
             "Required split/class directories are missing or empty."
@@ -416,11 +460,15 @@ def validate_quality(root: Path) -> dict:
             "Identical image contents were assigned to different class labels."
         )
 
+    # Determine whether all checks have passed by verifying that the status of each check is "PASS". 
+    # The result is stored in the variable 'passed'.
     passed = all(
         result["status"] == "PASS"
         for result in checks.values()
     )
 
+    # Return a comprehensive report summarizing the results of the dataset validation, including metadata, counts, 
+    # distributions, issues, and overall pass/fail status.
     return {
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
         "dataset_root": str(root),
@@ -450,7 +498,6 @@ def validate_quality(root: Path) -> dict:
         "failure_reasons": failure_reasons,
         "passed": passed,
     }
-    raise NotImplementedError("Implement data-quality validation")
 
 
 def build_splits(root: Path, version: str = "v1") -> dict:
@@ -614,6 +661,7 @@ def build_splits(root: Path, version: str = "v1") -> dict:
     # Confirm that identical image content never has conflicting labels.
     all_hash_groups: dict[str, list[tuple[Path, int]]] = {}
 
+    # Combine the training and test hash groups into a single dictionary to check for conflicting labels across the entire dataset.
     for groups in (train_hash_groups, test_hash_groups):
         for digest, items in groups.items():
             all_hash_groups.setdefault(digest, []).extend(items)
@@ -635,12 +683,16 @@ def build_splits(root: Path, version: str = "v1") -> dict:
                 }
             )
 
+    # If any conflicting hashes are found, raise a ValueError with a descriptive message indicating that identical image 
+    # contents have conflicting class labels and need to be resolved before splitting.
     if conflicting_hashes:
         raise ValueError(
             "Identical image contents have conflicting class labels. "
             "Resolve these records before splitting."
         )
 
+    # Select a representative image from a list of items based on the relative path. The representative is chosen 
+    # as the item with the lexicographically smallest relative path.
     def representative(
         items: list[tuple[Path, int]],
     ) -> tuple[Path, int]:
@@ -666,12 +718,17 @@ def build_splits(root: Path, version: str = "v1") -> dict:
         if digest not in overlapping_hashes
     ]
 
+    # Create a sorted list of relative paths for test files that were excluded due to overlapping hashes with the training set. 
+    # This list is used for reporting and analysis of the dataset splitting process.
     excluded_test_files = sorted(
         relative_path(path)
         for digest in overlapping_hashes
         for path, _ in test_hash_groups[digest]
     )
 
+    # Calculate the number of duplicates removed within the training and test sets by comparing the original lengths of the source 
+    # lists with the lengths of the unique hash groups. This provides insight into how many duplicate images were present in each 
+    # split before deduplication.
     within_train_duplicates_removed = (
         len(source_train) - len(train_hash_groups)
     )
@@ -686,6 +743,8 @@ def build_splits(root: Path, version: str = "v1") -> dict:
     train_items: list[tuple[Path, int]] = []
     val_items: list[tuple[Path, int]] = []
 
+    # For each class, shuffle the unique training items and split them into training and validation sets based on the 
+    # specified validation fraction.
     for class_name, class_index in config.CLASS_TO_IDX.items():
         class_items = sorted(
             [
@@ -702,8 +761,11 @@ def build_splits(root: Path, version: str = "v1") -> dict:
                 "training images to create train and validation sets."
             )
 
+        # Shuffle the class items using a random number generator initialized with the specified random seed. 
+        # This ensures that the train/validation split is reproducible across different runs of the code.
         rng.shuffle(class_items)
 
+        # Calculate the number of validation items for the current class based on the specified validation fraction.
         validation_count = int(
             round(len(class_items) * config.VAL_SPLIT)
         )
@@ -737,6 +799,8 @@ def build_splits(root: Path, version: str = "v1") -> dict:
         for name, items in final_splits.items()
     }
 
+    # Check for any overlapping hashes between the train, validation, and test splits. If any overlaps are found, 
+    # raise a RuntimeError indicating that hash leakage remains after splitting.
     overlap_counts = {
         "train_val": len(
             final_hash_sets["train"]
@@ -752,19 +816,26 @@ def build_splits(root: Path, version: str = "v1") -> dict:
         ),
     }
 
+    # If any overlaps are found between the train, validation, and test splits, raise a RuntimeError indicating that 
+    # hash leakage remains after splitting. This ensures that the final dataset splits are free from any duplicate image 
+    # content across the different splits.
     if any(overlap_counts.values()):
         raise RuntimeError(
             f"Hash leakage remains after splitting: {overlap_counts}"
         )
 
+    # Define a helper function to summarize the size, class counts, and class percentages for a given list of items.
     def split_summary(
         items: list[tuple[Path, int]],
     ) -> dict:
+
+        # Count the occurrences of each class label in the provided list of items using the Counter class from the collections module.
         label_counts = Counter(
             label
             for _, label in items
         )
 
+        # Create a dictionary mapping class names to their respective counts based on the label counts obtained from the previous step.
         class_counts = {
             class_name: label_counts[class_index]
             for class_name, class_index
@@ -773,6 +844,7 @@ def build_splits(root: Path, version: str = "v1") -> dict:
 
         size = len(items)
 
+        # Calculate the percentage of each class in the provided list of items based on the class counts and the total size of the list.
         class_percentages = {
             class_name: (
                 round(100.0 * count / size, 2)
@@ -788,10 +860,15 @@ def build_splits(root: Path, version: str = "v1") -> dict:
             "class_percentages": class_percentages,
         }
 
+    # Create the version directory for the dataset splits. The 'parents=True' argument ensures that any necessary parent directories 
+    # are created, and 'exist_ok=False' raises an error if the directory already exists, preventing accidental overwriting 
+    # of existing data.
     version_dir.mkdir(parents=True, exist_ok=False)
 
     manifest_hashes = {}
 
+    # Save the train, validation, and test manifests as JSON files in the version directory. Each manifest contains a list of 
+    # relative file paths and their corresponding class labels.
     for split_name, items in final_splits.items():
         manifest = [
             [relative_path(path), label]
@@ -809,10 +886,15 @@ def build_splits(root: Path, version: str = "v1") -> dict:
             encoding="utf-8",
         )
 
+        # Compute the SHA-256 hash of the manifest text to create a unique identifier for the manifest file. This hash can be used 
+        # to verify the integrity of the manifest file and ensure that it has not been tampered with or altered
         manifest_hashes[split_name] = hashlib.sha256(
             manifest_text.encode("utf-8")
         ).hexdigest()
 
+    # Save the metadata for the dataset version, including version ID, creation timestamp, random seed, validation fraction,
+    # class-to-index mapping, positive class information, split policy, source inventory hash, source summary, duplicate handling 
+    # details, split information, leakage check results, and manifest file hashes.
     metadata = {
         "version_id": version,
         "created_at_utc": datetime.now(
@@ -867,13 +949,17 @@ def build_splits(root: Path, version: str = "v1") -> dict:
         "manifest_sha256": manifest_hashes,
     }
 
+    # Save the metadata as a JSON file in the version directory. The metadata file contains detailed information about the 
+    # dataset version, including its creation timestamp, random seed, validation fraction, class-to-index mapping, positive class 
+    # information, split policy, source inventory hash, source summary, duplicate handling details, split information, leakage check 
+    # results, and manifest file hashes.
     metadata_path.write_text(
         json.dumps(metadata, indent=2),
         encoding="utf-8",
     )
 
     return metadata    
-    raise NotImplementedError("Build versioned stratified splits + metadata")
+    
 
 
 def load_split(version: str, name: str, root: Path) -> list[tuple[Path, int]]:
@@ -920,6 +1006,7 @@ def get_transforms(train: bool):
                         config.AUG["translate"],
                         config.AUG["translate"],
                     ),
+                    fill=128,
                 ),
                 # Color jittering to randomly change the brightness and contrast of the images.
                 # This augmentation simulates different lighting conditions, which can help the model learn to recognize objects 
@@ -946,7 +1033,6 @@ def get_transforms(train: bool):
     )
 
     return transforms.Compose(steps)
-    raise NotImplementedError("Define the train/eval transforms")
 
 
 def image_features(img: Image.Image) -> dict:
@@ -990,4 +1076,4 @@ def image_features(img: Image.Image) -> dict:
         name: features[name]
         for name in config.DRIFT_FEATURES
     }
-    raise NotImplementedError("Extract per-image drift features")
+    

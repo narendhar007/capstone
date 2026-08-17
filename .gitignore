@@ -62,3 +62,7 @@ artifacts/data_quality_report.json
 
 # Generated training metadata
 artifacts/model_meta.json
+# Generated monitoring / retraining outputs
+artifacts/drift_summary.json
+artifacts/reference_features.csv
+artifacts/retraining_decision.json
