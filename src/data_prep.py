@@ -969,7 +969,6 @@ def load_split(version: str, name: str, root: Path) -> list[tuple[Path, int]]:
 
 def get_transforms(train: bool):
     from torchvision import transforms
-    from torchvision.transforms import InterpolationMode
     # TODO 2 (preprocessing + augmentation): Grayscale(3) → Resize(224) → [train: flip,
     #         affine rotation/translate, ColorJitter] → ToTensor → Normalize(ImageNet).
     """
@@ -1007,7 +1006,6 @@ def get_transforms(train: bool):
                         config.AUG["translate"],
                         config.AUG["translate"],
                     ),
-                    interpolation=InterpolationMode.BILINEAR,
                     fill=128,
                 ),
                 # Color jittering to randomly change the brightness and contrast of the images.

@@ -25,9 +25,11 @@ def build_model(freeze: bool | None = None, pretrained: bool = True,) -> nn.Modu
 
     When freeze is True, only the new classification head is trainable.
     """
+    # If freeze is None, use the default value from config.FREEZE_BACKBONE.
     if freeze is None:
         freeze = config.FREEZE_BACKBONE
 
+    # Load the ResNet18 model with pretrained ImageNet weights if specified.
     weights = (
         ResNet18_Weights.IMAGENET1K_V1
         if pretrained
@@ -65,8 +67,7 @@ class EmbeddingExtractor(nn.Module):
     def __init__(self, net: nn.Module):
         super().__init__()
         # TODO 4 (embedding drift): keep all layers except the final fc.
-        # ResNet18 children end with:
-        # avgpool -> fc
+        # ResNet18 children end with: avgpool -> fc
         # Keep everything through avgpool and remove fc.
         self.features = nn.Sequential(
             *list(net.children())[:-1]
@@ -100,8 +101,18 @@ def load_model(path: Path | None = None, freeze: bool = True) -> nn.Module:
     Load trained model weights without downloading ImageNet weights.
 
     """
-    # load the model path from the argument or the default config path
-    model_path = path or config.MODEL_PATH
+    # Use the supplied path or the default model path from config.
+    model_path = (
+        Path(path)
+        if path is not None
+        else config.MODEL_PATH
+    )
+
+    # check if the model path exists, raise an error if it doesn't
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"Model checkpoint not found: {model_path}"
+        )
 
     # build the model architecture with the specified freeze option and without pretrained weights
     net = build_model(freeze=freeze,pretrained=False,)
@@ -114,7 +125,7 @@ def load_model(path: Path | None = None, freeze: bool = True) -> nn.Module:
     )
 
     # load the state dictionary into the model
-    net.load_state_dict(state_dict)
+    net.load_state_dict(state_dict, strict=True)
     net.to(config.DEVICE)
     net.eval()
 

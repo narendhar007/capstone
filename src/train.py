@@ -133,7 +133,6 @@ def class_weights(items) -> torch.Tensor:
         weights,
         dtype=torch.float32,
     )
-    raise NotImplementedError
 
 # implement the training epoch with optional validation, returning average loss and defect-class F1 score.
 def run_epoch( net, loader, loss_function, optimizer=None) -> tuple[float, float]:
@@ -530,6 +529,7 @@ def main() -> int:
     )
 
     # Subsample the training items to a maximum number of images specified in the configuration.
+    # This uses stratified sampling to maintain class proportions in the subsample.
     train_items = _subsample(
         train_items,
         config.MAX_TRAIN_IMAGES,
@@ -538,6 +538,9 @@ def main() -> int:
     # The generator makes training-data shuffling reproducible.
     data_generator = torch.Generator()
     data_generator.manual_seed(config.RANDOM_SEED)
+
+    # We are not using dataset.py's make_loaders() function here because we want to subsample the training data before creating 
+    # the DataLoader.
 
     # Create DataLoader instances for the training and validation datasets using the CastingDataset class.
     # The DataLoader handles batching, shuffling, and parallel data loading. CastingDataset is defined in dataset.py
@@ -718,6 +721,13 @@ def main() -> int:
             y_prob,
         )
 
+        # Count the number of misclassified samples by comparing the true labels (y_true) with the predicted labels (y_pred).
+        misclassified_count = int(
+            np.count_nonzero(
+                y_true != y_pred
+            )
+        )
+
         # Save the evaluation report, including MLflow run ID, dataset version, positive class, test metrics, 
         # misclassified count, and failure cases, to a JSON file for reference.
         evaluation_report = {
@@ -725,9 +735,7 @@ def main() -> int:
             "dataset_version": dataset_version,
             "positive_class": config.POSITIVE_CLASS,
             **test_metrics,
-            "misclassified_count": len(
-                misclassified_samples
-            ),
+            "misclassified_count": misclassified_count,
             "failure_cases": misclassified_samples,
         }
 
@@ -752,7 +760,7 @@ def main() -> int:
             "test_macro_f1":
                 test_metrics["macro_f1"],
             "test_misclassified_count":
-                len(misclassified_samples),
+                misclassified_count,
         }
 
         if test_metrics["roc_auc"] is not None:
@@ -1131,7 +1139,6 @@ def main() -> int:
     )
 
     return 0
-    raise NotImplementedError("Implement the training + MLflow + registry workflow")
 
 
 if __name__ == "__main__":

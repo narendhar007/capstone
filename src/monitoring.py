@@ -382,10 +382,15 @@ def run() -> dict:
     from evidently import Report
     from evidently.presets import DataDriftPreset
 
-    # Create an Evidently report with the DataDriftPreset to analyze the drift between the reference and current feature sets.
+    # Create an Evidently report object with the DataDriftPreset configured to use the PSI method and the specified thresholds 
+    # for PSI and drift share.
     report = Report(
         [
-            DataDriftPreset()
+            DataDriftPreset(
+                method="psi",
+                threshold=config.PSI_THRESHOLD,
+                drift_share=config.DRIFT_SHARE_THRESHOLD,
+            )
         ]
     )
 
@@ -525,12 +530,15 @@ def run() -> dict:
     # Load reference embeddings saved during training.
     # ---------------------------------------------------------
 
+    # Check if the reference embedding baseline file exists. If not, raise a FileNotFoundError with a message indicating that
+    # the baseline file was not found and suggesting to run save_reference_baseline() first.
     if not config.REFERENCE_EMBED.exists():
         raise FileNotFoundError(
             "Reference embedding baseline was not found. "
             "Run save_reference_baseline() first."
         )
 
+    # Load the reference embeddings and centroid from the .npz file specified in config.REFERENCE_EMBED using NumPy's np.load function.
     with np.load(
         config.REFERENCE_EMBED
     ) as reference_embedding_data:
@@ -540,12 +548,14 @@ def run() -> dict:
             ]
         )
 
+        # Load the reference centroid from the .npz file specified in config.REFERENCE_EMBED using NumPy's np.load function.
         reference_centroid = (
             reference_embedding_data[
                 "centroid"
             ]
         )
 
+    # Validate the shapes of the loaded reference embeddings and centroid to ensure they match the expected dimensions.
     if (
         reference_embeddings.ndim != 2
         or reference_embeddings.shape[1]
@@ -555,8 +565,8 @@ def run() -> dict:
             "Stored reference embeddings have "
             "an unexpected shape."
         )
-        
 
+    # Validate the shape of the loaded reference centroid to ensure it matches the expected embedding dimension.
     if reference_centroid.shape != (
         config.EMBEDDING_DIM,
     ):
@@ -565,6 +575,8 @@ def run() -> dict:
             "an unexpected shape."
         )
 
+    # Validate that the number of reference embeddings matches the number of reference items to ensure consistency between 
+    # the stored embeddings and the configured reference split.
     if (
         reference_embeddings.shape[0]
         != len(reference_items)
@@ -574,6 +586,8 @@ def run() -> dict:
             "match the configured reference split."
         )
 
+    # Validate that the generated reference embeddings from the current model match the stored reference embeddings
+    # to ensure that the currently loaded production model is consistent with the stored reference embeddings.
     if not np.allclose(
         generated_reference_embeddings,
         reference_embeddings,

@@ -296,8 +296,12 @@ def main() -> int:
         )
 
     # Read the drift summary JSON file and parse its contents into a dictionary.
-    drift = json.loads((config.ARTIFACT_DIR / "drift_summary.json").read_text(encoding="utf-8"))
-
+    drift = json.loads(
+        drift_summary_path.read_text(
+            encoding="utf-8"
+        )
+    )
+    
     # Evaluate retraining triggers based on the drift metrics and determine whether retraining is recommended.
     (
         retrain,
@@ -449,7 +453,9 @@ def main() -> int:
     # production checkpoint.
     # ---------------------------------------------------------
 
-    # Load the production model and candidate model from the same checkpoint, freezing their parameters to prevent further training.
+    # Load the production and candidate models from the same production
+    # checkpoint. The ResNet18 backbone remains frozen, while the candidate
+    # classification head remains trainable.
     production_model = load_model(
         path=config.MODEL_PATH,
         freeze=True,
@@ -757,11 +763,15 @@ def main() -> int:
                 config.MODEL_PATH,
                 )
 
+            # Save a reference baseline for monitoring purposes, which includes the candidate model and the validation items used 
+            # during training.
             reference_baseline = save_reference_baseline(
                 candidate_model,
                 val_items,
             )
 
+            # Update the validation status tag for the candidate model version in the MLflow model registry to 
+            # indicate that it has been promoted to production.
             client.set_model_version_tag(
                 name=config.REGISTERED_MODEL,
                 version=candidate_version,
@@ -771,19 +781,26 @@ def main() -> int:
 
             action = "promote"
 
+            # Update the production version after retraining to reflect the newly promoted candidate version.
             production_version_after = (
                 candidate_version
             )
 
             model_metadata = {}
 
+            # If a model metadata JSON file already exists, read its contents and parse it into a dictionary. 
+            # This allows for updating the existing metadata with new information related to the retraining process.
             if config.MODEL_META_PATH.exists():
                 model_metadata = json.loads(
                     config.MODEL_META_PATH.read_text(
                         encoding="utf-8"
                     )
                 )
-            
+
+            # Remove the incumbent model's clean-test metrics because they belong
+            # to the previous production model. The promoted candidate's evaluation
+            # on the simulated drifted batch is stored separately as
+            # drifted_test_metrics.         
             model_metadata.pop(
                 "test_metrics",
                 None,
@@ -848,6 +865,8 @@ def main() -> int:
                 }
             )
 
+            # Write the updated model metadata to a JSON file in the specified path, ensuring that it is formatted with 
+            # indentation for readability.
             config.MODEL_META_PATH.write_text(
                 json.dumps(
                     model_metadata,
@@ -856,6 +875,8 @@ def main() -> int:
                 encoding="utf-8",
             )
 
+            # Log the updated model metadata JSON file and the reference features CSV file as artifacts in MLflow for traceability 
+            # and reproducibility.
             mlflow.log_artifact(
                 str(config.MODEL_META_PATH),
                 artifact_path="promoted_model",
